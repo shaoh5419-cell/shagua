@@ -1,0 +1,43 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Theos
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git curl
+        git clone --recursive https://github.com/theos/theos.git $HOME/theos
+        curl -LO https://github.com/sbingner/llvm-project/releases/latest/download/linux-ios-arm64e-clang-toolchain.tar.lzma
+        TMP=$(mktemp -d)
+        tar -xvf linux-ios-arm64e-clang-toolchain.tar.lzma -C $TMP
+        mkdir -p $HOME/theos/toolchain/linux/iphone
+        mv $TMP/ios-arm64e-clang-toolchain/* $HOME/theos/toolchain/linux/iphone/
+
+    - name: Setup SDK
+      run: |
+        curl -LO https://github.com/theos/sdks/archive/master.zip
+        unzip master.zip
+        mv sdks-master/* $HOME/theos/sdks/
+
+    - name: Build
+      run: |
+        cd DDZHelper
+        export THEOS=$HOME/theos
+        make package
+
+    - name: Upload IPA
+      uses: actions/upload-artifact@v3
+      with:
+        name: DDZHelper
+        path: DDZHelper/packages/*.deb

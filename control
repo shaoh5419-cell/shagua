@@ -1,0 +1,8 @@
+Package: com.ddz.helper
+Name: DDZHelper
+Version: 1.0.0
+Architecture: iphoneos-arm64
+Description: 斗地主助手
+Maintainer: DDZ
+Author: DDZ
+Section: Applications
