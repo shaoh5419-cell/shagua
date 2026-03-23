@@ -4,6 +4,7 @@ stages:
   - build
 
 before_script:
+  - export DEBIAN_FRONTEND=noninteractive
   - apt-get update -qq
   - apt-get install -y git curl fakeroot zip unzip xz-utils build-essential rsync libncurses5 libxml2
 
