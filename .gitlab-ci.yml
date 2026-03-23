@@ -10,6 +10,7 @@ before_script:
 
 build:
   stage: build
+  retry: 2
   script:
     - git clone --recursive --depth=1 https://github.com/theos/theos.git $HOME/theos
     - curl -LO https://github.com/sbingner/llvm-project/releases/latest/download/linux-ios-arm64e-clang-toolchain.tar.lzma
