@@ -32,7 +32,6 @@ jobs:
 
     - name: Build
       run: |
-        cd DDZHelper
         export THEOS=$HOME/theos
         make package
 
@@ -40,4 +39,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: DDZHelper
-        path: DDZHelper/packages/*.deb
+        path: packages/*.deb
