@@ -5,14 +5,15 @@ stages:
 
 before_script:
   - apt-get update -qq
-  - apt-get install -y git curl fakeroot zip unzip xz-utils build-essential
+  - apt-get install -y git curl fakeroot zip unzip xz-utils build-essential rsync
 
 build:
   stage: build
   script:
     - git clone --recursive --depth=1 https://github.com/theos/theos.git $HOME/theos
     - curl -LO https://github.com/sbingner/llvm-project/releases/latest/download/linux-ios-arm64e-clang-toolchain.tar.lzma
-    - tar -xf linux-ios-arm64e-clang-toolchain.tar.lzma -C $HOME/theos/toolchain --strip-components=1
+    - mkdir -p $HOME/theos/toolchain/linux/iphone
+    - tar -xf linux-ios-arm64e-clang-toolchain.tar.lzma -C $HOME/theos/toolchain/linux/iphone --strip-components=1
     - curl -LO https://github.com/theos/sdks/archive/master.zip
     - unzip -q master.zip && mv sdks-master/* $HOME/theos/sdks/
     - export THEOS=$HOME/theos
