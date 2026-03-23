@@ -13,23 +13,29 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Cache Theos
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/theos
+        key: theos-${{ runner.os }}-v1
+
     - name: Setup Theos
       run: |
-        sudo apt-get update
-        sudo apt-get install -y git curl
-        sudo ln -sf /lib/x86_64-linux-gnu/libtinfo.so.6 /lib/x86_64-linux-gnu/libtinfo.so.5
-        git clone --recursive https://github.com/theos/theos.git $HOME/theos
-        curl -LO https://github.com/sbingner/llvm-project/releases/latest/download/linux-ios-arm64e-clang-toolchain.tar.lzma
-        TMP=$(mktemp -d)
-        tar -xvf linux-ios-arm64e-clang-toolchain.tar.lzma -C $TMP
-        mkdir -p $HOME/theos/toolchain/linux/iphone
-        mv $TMP/ios-arm64e-clang-toolchain/* $HOME/theos/toolchain/linux/iphone/
-
-    - name: Setup SDK
-      run: |
-        curl -LO https://github.com/theos/sdks/archive/master.zip
-        unzip master.zip
-        mv sdks-master/* $HOME/theos/sdks/
+        if [ ! -d "$HOME/theos" ]; then
+          sudo apt-get update
+          sudo apt-get install -y git curl
+          sudo ln -sf /lib/x86_64-linux-gnu/libtinfo.so.6 /lib/x86_64-linux-gnu/libtinfo.so.5
+          git clone --recursive https://github.com/theos/theos.git $HOME/theos
+          curl -LO https://github.com/sbingner/llvm-project/releases/latest/download/linux-ios-arm64e-clang-toolchain.tar.lzma
+          TMP=$(mktemp -d)
+          tar -xvf linux-ios-arm64e-clang-toolchain.tar.lzma -C $TMP
+          mkdir -p $HOME/theos/toolchain/linux/iphone
+          mv $TMP/ios-arm64e-clang-toolchain/* $HOME/theos/toolchain/linux/iphone/
+          curl -LO https://github.com/theos/sdks/archive/master.zip
+          unzip master.zip
+          mv sdks-master/* $HOME/theos/sdks/
+        fi
 
     - name: Build
       run: |
