@@ -16,9 +16,23 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 @property (nonatomic, strong) NSString *playerHandCards;
 @property (nonatomic, strong) NSString *threeLandlordCards;
 @property (nonatomic, assign) NSInteger playerPosition;
+@property (nonatomic, strong) NSMutableString *cardPlaySeq;
+@property (nonatomic, assign) NSInteger landlordCards;
+@property (nonatomic, assign) NSInteger landlordDownCards;
+@property (nonatomic, assign) NSInteger landlordUpCards;
 @end
 
 @implementation GameStateManager
+
+- (instancetype)init {
+    if (self = [super init]) {
+        self.cardPlaySeq = [NSMutableString string];
+        self.landlordCards = 20;
+        self.landlordDownCards = 17;
+        self.landlordUpCards = 17;
+    }
+    return self;
+}
 
 - (void)startMonitoring {
     self.currentPhase = GamePhaseLandlord;
@@ -94,14 +108,19 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (void)handlePlayPhase:(NSString *)text {
+    NSString *currentCards = [self extractCards:text];
+    if (currentCards.length > 0) {
+        self.playerHandCards = currentCards;
+    }
+
     NSDictionary *params = @{
         @"player_position": @(self.playerPosition),
-        @"player_hand_cards": self.playerHandCards,
-        @"num_cards_left_landlord": @(20),
-        @"num_cards_left_landlord_down": @(17),
-        @"num_cards_left_landlord_up": @(17),
+        @"player_hand_cards": self.playerHandCards ?: @"",
+        @"num_cards_left_landlord": @(self.landlordCards),
+        @"num_cards_left_landlord_down": @(self.landlordDownCards),
+        @"num_cards_left_landlord_up": @(self.landlordUpCards),
         @"three_landlord_cards": self.threeLandlordCards ?: @"",
-        @"card_play_action_seq": @"",
+        @"card_play_action_seq": self.cardPlaySeq ?: @"",
         @"other_hand_cards": @"",
         @"last_move_landlord": @"",
         @"last_move_landlord_down": @"",

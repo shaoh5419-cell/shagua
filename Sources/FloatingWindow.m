@@ -1,14 +1,22 @@
 #import "FloatingWindow.h"
 #import "GameStateManager.h"
+#import "UIWindow+Private.h"
+#import "SBSAccessibilityWindowHostingController.h"
 #import <objc/runtime.h>
 
 @interface FloatingWindow ()
 @property (nonatomic, strong) UILabel *displayLabel;
 @property (nonatomic, strong) GameStateManager *gameManager;
 @property (nonatomic, assign) CGPoint lastLocation;
+@property (nonatomic, strong) SBSAccessibilityWindowHostingController *hostingController;
 @end
 
 @implementation FloatingWindow
+
++ (BOOL)_isSystemWindow { return YES; }
+- (BOOL)_isWindowServerHostingManaged { return NO; }
+- (BOOL)_isSecure { return YES; }
+- (BOOL)_shouldCreateContextAsSecure { return YES; }
 
 - (instancetype)init {
     CGFloat width = 200;
@@ -17,19 +25,29 @@
 
     self = [super initWithFrame:frame];
     if (self) {
-        self.windowLevel = UIWindowLevelAlert + 100;
+        self.windowLevel = 10000010.0;
         self.backgroundColor = [UIColor clearColor];
         self.layer.cornerRadius = 12;
         self.clipsToBounds = YES;
 
         // 创建背景视图
         UIView *bgView = [[UIView alloc] initWithFrame:self.bounds];
-        bgView.backgroundColor = [UIColor colorWithWhite:0.1 alpha:0.85];
+        bgView.backgroundColor = [UIColor colorWithWhite:0.05 alpha:0.9];
         bgView.layer.cornerRadius = 12;
+        bgView.layer.borderWidth = 2;
+        bgView.layer.borderColor = [UIColor colorWithRed:0.2 green:0.5 blue:1.0 alpha:0.6].CGColor;
         [self addSubview:bgView];
 
+        // 创建标题标签
+        UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 5, width-20, 20)];
+        titleLabel.text = @"AI助手";
+        titleLabel.textColor = [UIColor colorWithRed:0.4 green:0.7 blue:1.0 alpha:1.0];
+        titleLabel.font = [UIFont boldSystemFontOfSize:12];
+        titleLabel.textAlignment = NSTextAlignmentCenter;
+        [self addSubview:titleLabel];
+
         // 创建显示标签
-        self.displayLabel = [[UILabel alloc] initWithFrame:CGRectInset(self.bounds, 10, 10)];
+        self.displayLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 25, width-20, height-30)];
         self.displayLabel.textColor = [UIColor whiteColor];
         self.displayLabel.font = [UIFont systemFontOfSize:14];
         self.displayLabel.numberOfLines = 0;
@@ -54,6 +72,20 @@
 - (void)show {
     self.hidden = NO;
     [self makeKeyAndVisible];
+
+    // 注册系统级悬浮窗
+    self.hostingController = [[objc_getClass("SBSAccessibilityWindowHostingController") alloc] init];
+    unsigned int contextId = [self _contextId];
+    double level = self.windowLevel;
+
+    NSMethodSignature *signature = [NSMethodSignature signatureWithObjCTypes:"v@:Id"];
+    NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:signature];
+    [invocation setTarget:self.hostingController];
+    [invocation setSelector:NSSelectorFromString(@"registerWindowWithContextID:atLevel:")];
+    [invocation setArgument:&contextId atIndex:2];
+    [invocation setArgument:&level atIndex:3];
+    [invocation invoke];
+
     [self.gameManager startMonitoring];
 }
 
