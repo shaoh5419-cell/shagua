@@ -28,8 +28,15 @@ jobs:
         export THEOS=$HOME/theos
         make package FINALPACKAGE=1
 
-    - name: Upload Package
+    - name: Convert to IPA
+      run: |
+        mkdir -p Payload
+        cp -r .theos/_ Payload/
+        zip -r DDZHelper.ipa Payload
+        rm -rf Payload
+
+    - name: Upload IPA
       uses: actions/upload-artifact@v4
       with:
-        name: DDZHelper-deb
-        path: packages/*.deb
+        name: DDZHelper-IPA
+        path: DDZHelper.ipa
