@@ -5,7 +5,7 @@ stages:
 
 before_script:
   - apt-get update -qq
-  - apt-get install -y git curl fakeroot zip unzip
+  - apt-get install -y git curl fakeroot zip unzip xz-utils
 
 build:
   stage: build
