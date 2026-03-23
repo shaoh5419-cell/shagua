@@ -21,8 +21,8 @@ build:
     - export THEOS=$HOME/theos
     - export SDKVERSION=13.7
     - make package FINALPACKAGE=1
-    - mkdir -p Payload/DDZHelper.app
-    - cp -r .theos/obj/arm64/DDZHelper.app/* Payload/DDZHelper.app/
+    - mkdir -p Payload
+    - cp -r .theos/obj/arm64/DDZHelper.app Payload/
     - cd Payload && zip -r ../DDZHelper.ipa . && cd ..
   artifacts:
     paths:
