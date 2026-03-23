@@ -9,7 +9,7 @@
     static AIManager *instance = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        instance = [[AIManager alloc] init];
+        instance = [[self alloc] init];
     });
     return instance;
 }

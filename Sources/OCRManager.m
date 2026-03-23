@@ -13,7 +13,7 @@
     static OCRManager *instance = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        instance = [[OCRManager alloc] init];
+        instance = [[self alloc] init];
     });
     return instance;
 }
