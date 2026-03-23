@@ -11,11 +11,11 @@ before_script:
 build:
   stage: build
   script:
-    - git clone --recursive --depth=1 https://github.com/theos/theos.git $HOME/theos
-    - curl -LO https://github.com/sbingner/llvm-project/releases/latest/download/linux-ios-arm64e-clang-toolchain.tar.lzma
+    - git clone --recursive --depth=1 https://github.com/theos/theos.git $HOME/theos || git clone --recursive --depth=1 https://github.com/theos/theos.git $HOME/theos
+    - curl -LO https://github.com/sbingner/llvm-project/releases/latest/download/linux-ios-arm64e-clang-toolchain.tar.lzma || curl -LO https://github.com/sbingner/llvm-project/releases/latest/download/linux-ios-arm64e-clang-toolchain.tar.lzma
     - mkdir -p $HOME/theos/toolchain/linux/iphone
     - tar -xf linux-ios-arm64e-clang-toolchain.tar.lzma -C $HOME/theos/toolchain/linux/iphone --strip-components=1
-    - curl -LO https://github.com/theos/sdks/archive/master.zip
+    - curl -LO https://github.com/theos/sdks/archive/master.zip || curl -LO https://github.com/theos/sdks/archive/master.zip
     - unzip -q master.zip && mv sdks-master/* $HOME/theos/sdks/
     - export THEOS=$HOME/theos
     - make package FINALPACKAGE=1
