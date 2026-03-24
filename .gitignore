@@ -3,4 +3,3 @@ packages/
 .DS_Store
 *.deb
 *.ipa
-Resources/AppIcon*.png
