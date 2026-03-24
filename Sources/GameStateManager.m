@@ -49,13 +49,26 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 
 - (void)captureAndAnalyze {
     [self captureScreen:^(UIImage *screenshot) {
-        if (!screenshot) return;
+        if (!screenshot) {
+            if (self.onResultUpdate) self.onResultUpdate(@"截屏失败");
+            return;
+        }
 
-        // 识别手牌区域（屏幕底部）
-        UIImage *handArea = [self cropImage:screenshot toRect:CGRectMake(0, screenshot.size.height * 0.7, screenshot.size.width, screenshot.size.height * 0.3)];
+        CGFloat screenHeight = screenshot.size.height;
+        CGFloat screenWidth = screenshot.size.width;
 
-        [[OCRManager shared] recognizeImage:handArea completion:^(NSString *text) {
-            [self processOCRResult:text screenshot:screenshot];
+        // 识别手牌区域（底部 25%，这里通常显示手牌）
+        CGRect handRect = CGRectMake(0, screenHeight * 0.75, screenWidth, screenHeight * 0.25);
+        UIImage *handArea = [self cropImage:screenshot toRect:handRect];
+
+        // 识别中央区域（用于判断游戏阶段和底牌）
+        CGRect centerRect = CGRectMake(screenWidth * 0.2, screenHeight * 0.3, screenWidth * 0.6, screenHeight * 0.4);
+        UIImage *centerArea = [self cropImage:screenshot toRect:centerRect];
+
+        [[OCRManager shared] recognizeImage:centerArea completion:^(NSString *centerText) {
+            [[OCRManager shared] recognizeImage:handArea completion:^(NSString *handText) {
+                [self processOCRResult:centerText handText:handText screenshot:screenshot];
+            }];
         }];
     }];
 }
@@ -68,49 +81,74 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (void)captureScreen:(void(^)(UIImage *image))completion {
-    // 使用 ReplayKit 截屏，不会包含悬浮窗
-    [[RPScreenRecorder sharedRecorder] startCaptureWithHandler:^(CMSampleBufferRef sampleBuffer, RPSampleBufferType bufferType, NSError *error) {
-        if (bufferType == RPSampleBufferTypeVideo && sampleBuffer) {
-            CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
-            CIImage *ciImage = [CIImage imageWithCVPixelBuffer:imageBuffer];
-            CIContext *context = [CIContext context];
-            CGImageRef cgImage = [context createCGImage:ciImage fromRect:ciImage.extent];
-            UIImage *screenshot = [UIImage imageWithCGImage:cgImage];
-            CGImageRelease(cgImage);
+    // 使用私有API截取屏幕，排除悬浮窗
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSArray *windows = [UIApplication sharedApplication].windows;
+        UIWindow *mainWindow = nil;
 
-            [[RPScreenRecorder sharedRecorder] stopCaptureWithHandler:nil];
-            if (completion) completion(screenshot);
+        // 找到主窗口（排除悬浮窗）
+        for (UIWindow *window in windows) {
+            if (window.windowLevel == UIWindowLevelNormal && !window.hidden) {
+                mainWindow = window;
+                break;
+            }
         }
-    } completionHandler:^(NSError *error) {
-        if (error && completion) completion(nil);
-    }];
+
+        if (!mainWindow) {
+            if (completion) completion(nil);
+            return;
+        }
+
+        UIGraphicsBeginImageContextWithOptions(mainWindow.bounds.size, NO, [UIScreen mainScreen].scale);
+        [mainWindow drawViewHierarchyInRect:mainWindow.bounds afterScreenUpdates:NO];
+        UIImage *screenshot = UIGraphicsGetImageFromCurrentImageContext();
+        UIGraphicsEndImageContext();
+
+        if (completion) completion(screenshot);
+    });
 }
 
-- (void)processOCRResult:(NSString *)text screenshot:(UIImage *)screenshot {
-    if ([text containsString:@"叫地主"] || [text containsString:@"抢地主"]) {
+- (void)processOCRResult:(NSString *)centerText handText:(NSString *)handText screenshot:(UIImage *)screenshot {
+    // 提取手牌
+    NSString *extractedCards = [self extractCards:handText];
+
+    // 调试信息
+    NSLog(@"中央文本: %@", centerText);
+    NSLog(@"手牌文本: %@", handText);
+    NSLog(@"提取卡牌: %@", extractedCards);
+
+    // 判断游戏阶段
+    if ([centerText containsString:@"叫地主"] || [centerText containsString:@"抢地主"]) {
         self.currentPhase = GamePhaseLandlord;
-        [self handleLandlordPhase:text];
-    } else if ([text containsString:@"加倍"]) {
+        [self handleLandlordPhase:extractedCards];
+    } else if ([centerText containsString:@"加倍"]) {
         self.currentPhase = GamePhaseDouble;
-        [self handleDoublePhase:text screenshot:screenshot];
-    } else {
+        [self handleDoublePhase:centerText screenshot:screenshot];
+    } else if (extractedCards.length > 0) {
         self.currentPhase = GamePhasePlay;
-        [self handlePlayPhase:text];
+        [self handlePlayPhase:extractedCards];
+    } else {
+        if (self.onResultUpdate) self.onResultUpdate(@"等待游戏开始...");
     }
 }
 
-- (void)handleLandlordPhase:(NSString *)text {
-    self.playerHandCards = [self extractCards:text];
-    if (self.playerHandCards.length != 17) return;
+- (void)handleLandlordPhase:(NSString *)cards {
+    if (cards.length < 13 || cards.length > 17) {
+        if (self.onResultUpdate) self.onResultUpdate([NSString stringWithFormat:@"手牌数量异常: %ld张", (long)cards.length]);
+        return;
+    }
 
-    NSDictionary *params = @{@"player_hand_cards": self.playerHandCards};
+    self.playerHandCards = cards;
+    NSDictionary *params = @{@"player_hand_cards": cards};
     [[AIManager shared] callLandlordAPI:params completion:^(NSDictionary *result) {
         if ([result[@"status"] intValue] == 0) {
             NSDictionary *data = result[@"data"];
             BOOL beLandlord = [data[@"be_landlord"] boolValue];
             BOOL competing = [data[@"competing_be_landlord"] boolValue];
-            NSString *msg = beLandlord ? @"建议：叫地主" : (competing ? @"建议：抢地主" : @"建议：不叫");
+            NSString *msg = beLandlord ? @"叫地主" : (competing ? @"抢地主" : @"不叫");
             if (self.onResultUpdate) self.onResultUpdate(msg);
+        } else {
+            if (self.onResultUpdate) self.onResultUpdate(@"AI分析失败");
         }
     }];
 }
@@ -133,20 +171,26 @@ typedef NS_ENUM(NSInteger, GamePhase) {
     }];
 }
 
-- (void)handlePlayPhase:(NSString *)text {
-    NSString *currentCards = [self extractCards:text];
-    if (currentCards.length > 0) {
-        self.playerHandCards = currentCards;
+- (void)handlePlayPhase:(NSString *)cards {
+    // 更新手牌
+    if (cards.length > 0 && cards.length <= 20) {
+        self.playerHandCards = cards;
+    }
+
+    // 如果没有手牌数据，跳过
+    if (!self.playerHandCards || self.playerHandCards.length == 0) {
+        if (self.onResultUpdate) self.onResultUpdate(@"等待识别手牌...");
+        return;
     }
 
     NSDictionary *params = @{
         @"player_position": @(self.playerPosition),
-        @"player_hand_cards": self.playerHandCards ?: @"",
+        @"player_hand_cards": self.playerHandCards,
         @"num_cards_left_landlord": @(self.landlordCards),
         @"num_cards_left_landlord_down": @(self.landlordDownCards),
         @"num_cards_left_landlord_up": @(self.landlordUpCards),
         @"three_landlord_cards": self.threeLandlordCards ?: @"",
-        @"card_play_action_seq": self.cardPlaySeq ?: @"",
+        @"card_play_action_seq": self.cardPlaySeq,
         @"other_hand_cards": @"",
         @"last_move_landlord": @"",
         @"last_move_landlord_down": @"",
@@ -160,17 +204,25 @@ typedef NS_ENUM(NSInteger, GamePhase) {
     [[AIManager shared] callBestActionAPI:params completion:^(NSDictionary *result) {
         if ([result[@"status"] intValue] == 0) {
             NSString *action = result[@"data"][@"best_action"];
-            NSString *msg = [NSString stringWithFormat:@"建议出牌：%@", action.length > 0 ? action : @"不出"];
+            NSString *msg = action.length > 0 ? action : @"不出";
             if (self.onResultUpdate) self.onResultUpdate(msg);
+        } else {
+            if (self.onResultUpdate) self.onResultUpdate(@"AI分析中...");
         }
     }];
 }
 
 - (NSString *)extractCards:(NSString *)text {
-    // 卡牌映射：10->T, 小王->X, 大王->D
+    // 预处理：统一格式
+    text = [text stringByReplacingOccurrencesOfString:@" " withString:@""];
+    text = [text stringByReplacingOccurrencesOfString:@"♠" withString:@""];
+    text = [text stringByReplacingOccurrencesOfString:@"♥" withString:@""];
+    text = [text stringByReplacingOccurrencesOfString:@"♣" withString:@""];
+    text = [text stringByReplacingOccurrencesOfString:@"♦" withString:@""];
     text = [text stringByReplacingOccurrencesOfString:@"10" withString:@"T"];
     text = [text stringByReplacingOccurrencesOfString:@"小王" withString:@"X"];
     text = [text stringByReplacingOccurrencesOfString:@"大王" withString:@"D"];
+    text = [text stringByReplacingOccurrencesOfString:@"王" withString:@""];
 
     NSMutableString *cards = [NSMutableString string];
     NSArray *validCards = @[@"3",@"4",@"5",@"6",@"7",@"8",@"9",@"T",@"J",@"Q",@"K",@"A",@"2",@"X",@"D"];
@@ -186,6 +238,28 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 
 - (NSString *)extractLandlordCards:(NSString *)text {
     return [self extractCards:text];
+}
+
+- (void)updateCardCounts:(NSString *)playedCards byPlayer:(NSInteger)position {
+    NSInteger count = playedCards.length;
+    if (position == 0) {
+        self.landlordCards -= count;
+    } else if (position == 1) {
+        self.landlordDownCards -= count;
+    } else if (position == 2) {
+        self.landlordUpCards -= count;
+    }
+}
+
+- (void)resetGame {
+    self.currentPhase = GamePhaseIdle;
+    self.playerHandCards = nil;
+    self.threeLandlordCards = nil;
+    self.playerPosition = 0;
+    [self.cardPlaySeq setString:@""];
+    self.landlordCards = 20;
+    self.landlordDownCards = 17;
+    self.landlordUpCards = 17;
 }
 
 @end

@@ -6,4 +6,5 @@ typedef void(^ResultUpdateBlock)(NSString *result);
 @property (nonatomic, copy) ResultUpdateBlock onResultUpdate;
 - (void)startMonitoring;
 - (void)stopMonitoring;
+- (void)resetGame;
 @end
