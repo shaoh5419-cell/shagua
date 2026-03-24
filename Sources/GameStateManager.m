@@ -64,30 +64,35 @@ typedef NS_ENUM(NSInteger, GamePhase) {
             return;
         }
 
-        if (self.onResultUpdate) self.onResultUpdate(@"识别中...");
-
         // 根据阶段调整识别区域
         UIImage *centerArea = [self cropImage:screenshot toRect:[self getCenterROI:screenshot]];
         UIImage *handArea = [self cropImage:screenshot toRect:[self getHandROI:screenshot]];
 
-        // 先识别中央，再识别手牌（串行）
+        // 先识别中央
         [[OCRManager shared] recognizeImage:centerArea completion:^(NSString *centerText) {
+            // 实时显示中央识别结果
+            if (centerText.length > 0) {
+                if (self.onResultUpdate) {
+                    self.onResultUpdate([NSString stringWithFormat:@"中:%@", centerText]);
+                }
+            }
+
+            // 再识别手牌
             [[OCRManager shared] recognizeImage:handArea completion:^(NSString *handText) {
+                // 实时显示手牌识别结果
+                if (handText.length > 0) {
+                    if (self.onResultUpdate) {
+                        self.onResultUpdate([NSString stringWithFormat:@"手:%@", handText]);
+                    }
+                }
+
                 // 去重：避免重复识别相同内容
                 NSString *combinedText = [NSString stringWithFormat:@"%@|%@", centerText, handText];
                 if ([combinedText isEqualToString:self.lastRecognizedText]) {
-                    if (self.onResultUpdate) self.onResultUpdate(@"重复");
                     return;
                 }
                 self.lastRecognizedText = combinedText;
                 self.lastRecognitionTime = [[NSDate date] timeIntervalSince1970];
-
-                // 显示识别结果用于测试
-                NSString *cards = [self extractCards:handText];
-                NSString *debugMsg = [NSString stringWithFormat:@"中:%@|手:%@",
-                    centerText.length > 0 ? [centerText substringToIndex:MIN(8, centerText.length)] : @"无",
-                    cards.length > 0 ? cards : @"无"];
-                if (self.onResultUpdate) self.onResultUpdate(debugMsg);
 
                 [self processOCRResult:centerText handText:handText screenshot:screenshot];
             }];
