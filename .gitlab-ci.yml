@@ -33,4 +33,3 @@ build:
   artifacts:
     paths:
       - DDZHelper.ipa
-      - packages/*.deb
