@@ -19,9 +19,15 @@
     CGFloat height = 80;
     CGRect frame = CGRectMake(20, 100, width, height);
 
-    self = [super initWithFrame:frame];
+    if (@available(iOS 13.0, *)) {
+        self = [super initWithWindowScene:nil];
+    } else {
+        self = [super initWithFrame:frame];
+    }
+
     if (self) {
-        self.windowLevel = UIWindowLevelAlert + 1;
+        self.frame = frame;
+        self.windowLevel = UIWindowLevelStatusBar + 100;
         self.backgroundColor = [UIColor clearColor];
 
         self.rootVC = [[UIViewController alloc] init];
