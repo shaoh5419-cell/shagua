@@ -6,5 +6,8 @@
 - (void)__completeAndRunAsPlugin;
 @end
 
+__attribute__((weak_import))
 void UIApplicationInitialize(void);
+
+__attribute__((weak_import))
 void UIApplicationInstantiateSingleton(Class cls);
