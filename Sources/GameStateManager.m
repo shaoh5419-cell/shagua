@@ -2,7 +2,7 @@
 #import "OCRManager.h"
 #import "AIManager.h"
 #import "ReplayKitManager.h"
-#import "LogWindow.h"
+#import "FloatingWindow.h"
 #import <UIKit/UIKit.h>
 #import <CoreGraphics/CoreGraphics.h>
 

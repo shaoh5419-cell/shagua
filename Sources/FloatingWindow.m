@@ -9,6 +9,8 @@
 @property (nonatomic, strong) UIViewController *rootVC;
 @property (nonatomic, strong) UIPanGestureRecognizer *panGesture;
 @property (nonatomic, assign) CGFloat initialY;
+@property (nonatomic, strong) UITextView *logView;
+@property (nonatomic, assign) BOOL showingLog;
 @end
 
 @implementation FloatingWindow
@@ -204,6 +206,38 @@
         self.hidden = YES;
         self.transform = CGAffineTransformIdentity;
     }];
+}
+
+- (void)addLog:(NSString *)message {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (!self.logView) {
+            // 第一次创建日志视图
+            CGRect screen = [UIScreen mainScreen].bounds;
+            self.logView = [[UITextView alloc] initWithFrame:CGRectMake(0, 0, screen.size.width, screen.size.height * 0.3)];
+            self.logView.backgroundColor = [UIColor colorWithRed:0.05 green:0.05 blue:0.05 alpha:0.95];
+            self.logView.textColor = [UIColor colorWithRed:0.0 green:1.0 blue:0.0 alpha:1.0];
+            self.logView.font = [UIFont systemFontOfSize:9];
+            self.logView.editable = NO;
+            self.logView.scrollEnabled = YES;
+            [self.rootVC.view addSubview:self.logView];
+            self.showingLog = YES;
+        }
+
+        NSString *timestamp = [self getCurrentTimestamp];
+        NSString *logLine = [NSString stringWithFormat:@"[%@] %@\n", timestamp, message];
+        self.logView.text = [self.logView.text stringByAppendingString:logLine];
+
+        // 自动滚动到底部
+        if (self.logView.text.length > 0) {
+            [self.logView scrollRangeToVisible:NSMakeRange(self.logView.text.length - 1, 1)];
+        }
+    });
+}
+
+- (NSString *)getCurrentTimestamp {
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+    formatter.dateFormat = @"HH:mm:ss";
+    return [formatter stringFromDate:[NSDate date]];
 }
 
 @end
