@@ -70,20 +70,23 @@ typedef NS_ENUM(NSInteger, GamePhase) {
         UIImage *centerArea = [self cropImage:screenshot toRect:[self getCenterROI:screenshot]];
         UIImage *handArea = [self cropImage:screenshot toRect:[self getHandROI:screenshot]];
 
+        // 先识别中央，再识别手牌（串行）
         [[OCRManager shared] recognizeImage:centerArea completion:^(NSString *centerText) {
             [[OCRManager shared] recognizeImage:handArea completion:^(NSString *handText) {
                 // 去重：避免重复识别相同内容
                 NSString *combinedText = [NSString stringWithFormat:@"%@|%@", centerText, handText];
                 if ([combinedText isEqualToString:self.lastRecognizedText]) {
+                    if (self.onResultUpdate) self.onResultUpdate(@"重复");
                     return;
                 }
                 self.lastRecognizedText = combinedText;
                 self.lastRecognitionTime = [[NSDate date] timeIntervalSince1970];
 
                 // 显示识别结果用于测试
+                NSString *cards = [self extractCards:handText];
                 NSString *debugMsg = [NSString stringWithFormat:@"中:%@|手:%@",
-                    centerText.length > 0 ? [centerText substringToIndex:MIN(5, centerText.length)] : @"无",
-                    handText.length > 0 ? [handText substringToIndex:MIN(5, handText.length)] : @"无"];
+                    centerText.length > 0 ? [centerText substringToIndex:MIN(8, centerText.length)] : @"无",
+                    cards.length > 0 ? cards : @"无"];
                 if (self.onResultUpdate) self.onResultUpdate(debugMsg);
 
                 [self processOCRResult:centerText handText:handText screenshot:screenshot];

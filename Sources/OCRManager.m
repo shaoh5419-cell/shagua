@@ -19,7 +19,19 @@
     }
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        // 设置超时：5秒后如果还没完成就返回空
+        __block BOOL completed = NO;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            if (!completed) {
+                completed = YES;
+                if (completion) completion(@"");
+            }
+        });
+
         VNRecognizeTextRequest *request = [[VNRecognizeTextRequest alloc] initWithCompletionHandler:^(VNRequest *request, NSError *error) {
+            if (completed) return;
+            completed = YES;
+
             if (error) {
                 NSLog(@"OCR错误: %@", error);
                 if (completion) completion(@"");
@@ -40,9 +52,10 @@
             });
         }];
 
-        request.recognitionLevel = VNRequestTextRecognitionLevelAccurate;
-        request.recognitionLanguages = @[@"zh-Hans", @"en-US"];
-        request.usesLanguageCorrection = YES;
+        // 使用快速识别模式
+        request.recognitionLevel = VNRequestTextRecognitionLevelFast;
+        request.recognitionLanguages = @[@"zh-Hans"];
+        request.usesLanguageCorrection = NO;
 
         VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCGImage:image.CGImage options:@{}];
         NSError *error = nil;
@@ -50,9 +63,12 @@
 
         if (error) {
             NSLog(@"OCR执行错误: %@", error);
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (completion) completion(@"");
-            });
+            if (!completed) {
+                completed = YES;
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (completion) completion(@"");
+                });
+            }
         }
     });
 }
