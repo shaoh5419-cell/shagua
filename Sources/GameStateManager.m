@@ -1,13 +1,9 @@
 #import "GameStateManager.h"
 #import "OCRManager.h"
 #import "AIManager.h"
+#import "ReplayKitManager.h"
 #import <UIKit/UIKit.h>
 #import <CoreGraphics/CoreGraphics.h>
-
-// 私有API声明
-@interface UIScreen (Private)
-- (CGImageRef)_createSnapshotWithRect:(CGRect)rect;
-@end
 
 typedef NS_ENUM(NSInteger, GamePhase) {
     GamePhaseIdle,
@@ -43,11 +39,13 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 - (void)startMonitoring {
     self.currentPhase = GamePhaseLandlord;
     if (self.onResultUpdate) self.onResultUpdate(@"监控中...");
+    [[ReplayKitManager shared] startRecording];
     self.monitorTimer = [NSTimer scheduledTimerWithTimeInterval:2.0 target:self selector:@selector(captureAndAnalyze) userInfo:nil repeats:YES];
     [self captureAndAnalyze];
 }
 
 - (void)stopMonitoring {
+    [[ReplayKitManager shared] stopRecording];
     [self.monitorTimer invalidate];
     self.monitorTimer = nil;
 }
@@ -83,40 +81,9 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (void)captureScreen:(void(^)(UIImage *image))completion {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        UIScreen *screen = [UIScreen mainScreen];
-        CGRect screenRect = screen.bounds;
-
-        // 使用私有API截取整个屏幕
-        if ([screen respondsToSelector:@selector(_createSnapshotWithRect:)]) {
-            CGImageRef cgImage = [screen _createSnapshotWithRect:screenRect];
-            if (cgImage) {
-                UIImage *screenshot = [UIImage imageWithCGImage:cgImage];
-                CGImageRelease(cgImage);
-                if (completion) completion(screenshot);
-                return;
-            }
-        }
-
-        // 降级方案
-        UIGraphicsBeginImageContextWithOptions(screenRect.size, NO, screen.scale);
-        CGContextRef context = UIGraphicsGetCurrentContext();
-        if (!context) {
-            UIGraphicsEndImageContext();
-            if (completion) completion(nil);
-            return;
-        }
-
-        for (UIWindow *window in [UIApplication sharedApplication].windows) {
-            if (window.windowLevel < 10000000) {
-                [window.layer renderInContext:context];
-            }
-        }
-        UIImage *screenshot = UIGraphicsGetImageFromCurrentImageContext();
-        UIGraphicsEndImageContext();
-
+    [[ReplayKitManager shared] captureScreenshot:^(UIImage *screenshot) {
         if (completion) completion(screenshot);
-    });
+    }];
 }
 
 - (void)processOCRResult:(NSString *)centerText handText:(NSString *)handText screenshot:(UIImage *)screenshot {
