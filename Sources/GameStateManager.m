@@ -63,9 +63,6 @@ typedef NS_ENUM(NSInteger, GamePhase) {
             return;
         }
 
-        CGFloat screenHeight = screenshot.size.height;
-        CGFloat screenWidth = screenshot.size.width;
-
         // 根据阶段调整识别区域
         UIImage *centerArea = [self cropImage:screenshot toRect:[self getCenterROI:screenshot]];
         UIImage *handArea = [self cropImage:screenshot toRect:[self getHandROI:screenshot]];
