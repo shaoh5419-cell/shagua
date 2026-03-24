@@ -41,37 +41,10 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (void)startMonitoring {
-    [self showAlert:@"startMonitoring 被调用"];
     self.currentPhase = GamePhaseLandlord;
     if (self.onResultUpdate) self.onResultUpdate(@"监控中...");
     self.monitorTimer = [NSTimer scheduledTimerWithTimeInterval:2.0 target:self selector:@selector(captureAndAnalyze) userInfo:nil repeats:YES];
     [self captureAndAnalyze];
-}
-
-- (void)showAlert:(NSString *)message {
-    NSLog(@"[DDZ] Alert: %@", message);
-
-    dispatch_async(dispatch_get_main_queue(), ^{
-        UIWindow *keyWindow = [UIApplication sharedApplication].keyWindow;
-        if (!keyWindow) {
-            NSLog(@"[DDZ] keyWindow is nil");
-            return;
-        }
-
-        UIViewController *rootVC = keyWindow.rootViewController;
-        if (!rootVC) {
-            NSLog(@"[DDZ] rootViewController is nil");
-            return;
-        }
-
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"调试信息" message:message preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
-
-        NSLog(@"[DDZ] Presenting alert from %@", rootVC.class);
-        [rootVC presentViewController:alert animated:YES completion:^{
-            NSLog(@"[DDZ] Alert presented successfully");
-        }];
-    });
 }
 
 - (void)stopMonitoring {
@@ -80,16 +53,10 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (void)captureAndAnalyze {
-    // 立即显示测试弹窗
-    [self showAlert:@"captureAndAnalyze 被调用"];
-
     [self captureScreen:^(UIImage *screenshot) {
         if (!screenshot) {
-            [self showAlert:@"截屏失败"];
             return;
         }
-
-        [self showAlert:[NSString stringWithFormat:@"截屏成功: %.0fx%.0f", screenshot.size.width, screenshot.size.height]];
 
         CGFloat screenHeight = screenshot.size.height;
         CGFloat screenWidth = screenshot.size.width;
@@ -102,10 +69,6 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 
         [[OCRManager shared] recognizeImage:centerArea completion:^(NSString *centerText) {
             [[OCRManager shared] recognizeImage:handArea completion:^(NSString *handText) {
-                NSString *msg = [NSString stringWithFormat:@"中央: %@\n手牌: %@",
-                                centerText.length > 0 ? centerText : @"无",
-                                handText.length > 0 ? handText : @"无"];
-                [self showAlert:msg];
                 [self processOCRResult:centerText handText:handText screenshot:screenshot];
             }];
         }];
