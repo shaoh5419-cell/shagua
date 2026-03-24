@@ -2,12 +2,9 @@
 #import <spawn.h>
 #import <sys/wait.h>
 #import <mach-o/dyld.h>
-#import <notify.h>
 #import "PersonaHelpers.h"
 
 extern char **environ;
-
-#define DDZ_HUD_EXIT_NOTIFICATION "com.ddz.helper.hud.exit"
 
 @interface RootViewController ()
 @property (nonatomic, strong) UIButton *startButton;
@@ -122,8 +119,28 @@ extern char **environ;
             int unused;
             waitpid(pid, &unused, 0);
         } else {
-            // 通知HUD进程退出
-            notify_post(DDZ_HUD_EXIT_NOTIFICATION);
+            // 以root身份spawn自身-exit，kill HUD进程（参考TrollSpeed）
+            uint32_t size = 0;
+            _NSGetExecutablePath(NULL, &size);
+            char *executablePath = (char *)malloc(size);
+            _NSGetExecutablePath(executablePath, &size);
+
+            posix_spawnattr_t attr;
+            posix_spawnattr_init(&attr);
+            posix_spawnattr_set_persona_np(&attr, 99, POSIX_SPAWN_PERSONA_FLAGS_OVERRIDE);
+            posix_spawnattr_set_persona_uid_np(&attr, 0);
+            posix_spawnattr_set_persona_gid_np(&attr, 0);
+
+            pid_t task_pid;
+            const char *args[] = {executablePath, "-exit", NULL};
+            int rc = posix_spawn(&task_pid, executablePath, NULL, &attr, (char **)args, environ);
+            posix_spawnattr_destroy(&attr);
+            free(executablePath);
+
+            if (rc == 0) {
+                int status;
+                waitpid(task_pid, &status, 0);
+            }
         }
         self.startButton.selected = NO;
         self.isRunning = NO;
