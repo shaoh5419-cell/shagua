@@ -14,9 +14,11 @@
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     NSLog(@"[HUD] HUDAppDelegate 启动");
 
-    // 创建调试窗口
-    [self createDebugWindow];
-    [self addDebugLog:@"HUD 进程已启动"];
+    // 在主线程创建调试窗口
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self createDebugWindow];
+        [self addDebugLog:@"HUD 进程已启动"];
+    });
 
     FloatingWindow *floatingWindow = [[FloatingWindow alloc] init];
     self.window = floatingWindow;
