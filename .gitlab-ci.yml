@@ -24,8 +24,11 @@ build:
     - mkdir -p Payload
     - cp -r .theos/obj/arm64/DDZHelper.app Payload/
     - cp Resources/Info.plist Payload/DDZHelper.app/
+    - chmod +x Payload/DDZHelper.app/DDZHelper
+    - rm -rf Payload/DDZHelper.app/DDZHelper.dSYM
     - ls -la Payload/DDZHelper.app/
     - cd Payload && zip -r ../DDZHelper.ipa . && cd ..
+    - unzip -l DDZHelper.ipa
   artifacts:
     paths:
       - DDZHelper.ipa
