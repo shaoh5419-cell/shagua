@@ -165,7 +165,8 @@
         self.initialY = self.frame.origin.y;
     }
     else if (gesture.state == UIGestureRecognizerStateChanged) {
-        CGFloat translation = [gesture translationInView:gesture.view.superview].y;
+        // 关键：相对于屏幕坐标空间计算translation
+        CGFloat translation = [gesture translationInView:nil].y;
         CGFloat newY = self.initialY + translation;
 
         // 限制在屏幕范围内
