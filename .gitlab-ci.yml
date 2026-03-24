@@ -22,8 +22,11 @@ build:
     - make package FINALPACKAGE=1
     - mkdir -p Payload
     - cp -r .theos/_/Applications/DDZHelper.app Payload/
+    - mkdir -p Payload/Library/LaunchDaemons
+    - cp .theos/_/Library/LaunchDaemons/com.ddz.helper.daemon.plist Payload/Library/LaunchDaemons/
     - ls -la Payload/DDZHelper.app/
-    - zip -r DDZHelper.ipa Payload
+    - ls -la Payload/Library/LaunchDaemons/
+    - cd Payload && zip -r ../DDZHelper.ipa DDZHelper.app Library && cd ..
     - unzip -l DDZHelper.ipa
   artifacts:
     paths:
