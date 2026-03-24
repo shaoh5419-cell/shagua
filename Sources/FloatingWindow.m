@@ -19,11 +19,7 @@
     CGFloat height = 80;
     CGRect frame = CGRectMake(20, 100, width, height);
 
-    if (@available(iOS 13.0, *)) {
-        self = [super initWithWindowScene:nil];
-    } else {
-        self = [super initWithFrame:frame];
-    }
+    self = [super initWithFrame:frame];
 
     if (self) {
         self.frame = frame;
