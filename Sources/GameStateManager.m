@@ -158,7 +158,13 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (void)captureScreen:(void(^)(UIImage *image))completion {
+    [[LogWindow shared] addLog:@"captureScreen 被调用"];
     [[ReplayKitManager shared] captureScreenshot:^(UIImage *screenshot) {
+        if (screenshot) {
+            [[LogWindow shared] addLog:[NSString stringWithFormat:@"截屏成功: %.0fx%.0f", screenshot.size.width, screenshot.size.height]];
+        } else {
+            [[LogWindow shared] addLog:@"截屏返回 nil"];
+        }
         if (completion) completion(screenshot);
     }];
 }
