@@ -18,13 +18,13 @@
 - (instancetype)init {
     CGRect screen = [UIScreen mainScreen].bounds;
 
-    // 竖向窄条：宽68，高200
-    CGFloat w = 68;
-    CGFloat h = 200;
+    // 竖向窄条：宽64，高240
+    CGFloat w = 64;
+    CGFloat h = 240;
 
-    // 贴紧 portrait 右边缘，垂直居中偏上
+    // 贴紧 portrait 右边缘，垂直居中
     CGFloat x = screen.size.width - w;
-    CGFloat y = screen.size.height * 0.35 - h / 2;
+    CGFloat y = (screen.size.height - h) / 2;
 
     self = [super initWithFrame:CGRectMake(x, y, w, h)];
     if (!self) return nil;
@@ -37,94 +37,166 @@
     self.rootVC.view.backgroundColor = [UIColor clearColor];
     self.rootViewController = self.rootVC;
 
-    // 背景容器：竖长条，左侧圆角
+    // ═══ 背景容器 ═══
     UIView *bg = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, h)];
-    bg.backgroundColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.12 alpha:0.94];
+    bg.backgroundColor = [UIColor colorWithRed:0.05 green:0.05 blue:0.10 alpha:0.95];
     bg.layer.cornerRadius = w / 2;
-    bg.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMinXMaxYCorner;  // 左侧圆角
-    bg.layer.borderWidth = 1.0;
-    bg.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.12].CGColor;
-    bg.layer.shadowColor = [UIColor blackColor].CGColor;
-    bg.layer.shadowOffset = CGSizeMake(-3, 3);
-    bg.layer.shadowRadius = 8;
-    bg.layer.shadowOpacity = 0.55;
+    bg.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMinXMaxYCorner;
+    bg.layer.borderWidth = 1.2;
+    bg.layer.borderColor = [UIColor colorWithRed:0.18 green:0.72 blue:1.0 alpha:0.35].CGColor;
+
+    // 内发光效果
+    bg.layer.shadowColor = [UIColor colorWithRed:0.18 green:0.72 blue:1.0 alpha:1.0].CGColor;
+    bg.layer.shadowOffset = CGSizeZero;
+    bg.layer.shadowRadius = 4;
+    bg.layer.shadowOpacity = 0.15;
+
+    // 外投影
+    CALayer *shadowLayer = [CALayer layer];
+    shadowLayer.frame = bg.bounds;
+    shadowLayer.cornerRadius = w / 2;
+    shadowLayer.shadowColor = [UIColor blackColor].CGColor;
+    shadowLayer.shadowOffset = CGSizeMake(-2, 3);
+    shadowLayer.shadowRadius = 8;
+    shadowLayer.shadowOpacity = 0.6;
+    shadowLayer.backgroundColor = [UIColor clearColor].CGColor;
+    [self.rootVC.view.layer insertSublayer:shadowLayer atIndex:0];
+
     [self.rootVC.view addSubview:bg];
 
-    // 顶部蓝色横条
-    UIView *topStripe = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, 4)];
-    topStripe.backgroundColor = [UIColor colorWithRed:0.18 green:0.72 blue:1.0 alpha:1.0];
-    UIView *stripeWrap = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, 16)];
-    stripeWrap.clipsToBounds = YES;
-    stripeWrap.layer.cornerRadius = w / 2;
-    stripeWrap.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
-    [stripeWrap addSubview:topStripe];
-    [bg addSubview:stripeWrap];
+    // ═══ 顶部装饰带（渐变） ═══
+    UIView *topWrap = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, 20)];
+    topWrap.clipsToBounds = YES;
+    topWrap.layer.cornerRadius = w / 2;
+    topWrap.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
 
-    // "AI" 标签（顶部）
-    UILabel *aiLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 16, w, 30)];
+    CAGradientLayer *topGrad = [CAGradientLayer layer];
+    topGrad.frame = CGRectMake(0, 0, w, 5);
+    topGrad.colors = @[
+        (id)[UIColor colorWithRed:0.18 green:0.72 blue:1.0 alpha:0.9].CGColor,
+        (id)[UIColor colorWithRed:0.10 green:0.50 blue:0.85 alpha:0.7].CGColor,
+    ];
+    topGrad.startPoint = CGPointMake(0, 0);
+    topGrad.endPoint = CGPointMake(1, 0);
+    [topWrap.layer addSublayer:topGrad];
+    [bg addSubview:topWrap];
+
+    // ═══ AI 图标标签 ═══
+    UILabel *aiLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 18, w, 32)];
     aiLabel.text = @"AI";
-    aiLabel.textColor = [UIColor colorWithRed:0.18 green:0.72 blue:1.0 alpha:1.0];
-    aiLabel.font = [UIFont boldSystemFontOfSize:14];
+    aiLabel.textColor = [UIColor colorWithRed:0.20 green:0.75 blue:1.0 alpha:1.0];
+    aiLabel.font = [UIFont boldSystemFontOfSize:16];
     aiLabel.textAlignment = NSTextAlignmentCenter;
     [bg addSubview:aiLabel];
 
-    // 横向分隔线
-    UIView *sep = [[UIView alloc] initWithFrame:CGRectMake(12, 48, w - 24, 1)];
-    sep.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.12];
-    [bg addSubview:sep];
+    // ═══ 分隔线 ═══
+    UIView *sep1 = [[UIView alloc] initWithFrame:CGRectMake(14, 52, w - 28, 1)];
+    sep1.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.10];
+    [bg addSubview:sep1];
 
-    // 指示点（居中）
-    UIView *dot = [[UIView alloc] initWithFrame:CGRectMake((w - 8) / 2, 60, 8, 8)];
-    dot.layer.cornerRadius = 4;
-    dot.backgroundColor = [UIColor colorWithRed:0.18 green:0.72 blue:1.0 alpha:0.6];
+    // ═══ 状态指示点 ═══
+    UIView *dot = [[UIView alloc] initWithFrame:CGRectMake((w - 10) / 2, 64, 10, 10)];
+    dot.layer.cornerRadius = 5;
+    dot.backgroundColor = [UIColor colorWithRed:0.18 green:0.72 blue:1.0 alpha:0.7];
+    dot.layer.shadowColor = [UIColor colorWithRed:0.18 green:0.72 blue:1.0 alpha:1.0].CGColor;
+    dot.layer.shadowOffset = CGSizeZero;
+    dot.layer.shadowRadius = 4;
+    dot.layer.shadowOpacity = 0.8;
     self.indicatorDot = dot;
     [bg addSubview:dot];
 
-    // 主文本标签（竖向排列，旋转90度）
-    self.displayLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 75, w, h - 80)];
-    self.displayLabel.textColor = [UIColor colorWithWhite:0.95 alpha:1.0];
-    self.displayLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-    self.displayLabel.numberOfLines = 0;
-    self.displayLabel.textAlignment = NSTextAlignmentCenter;
-    self.displayLabel.text = @"等待\n识别...";
-    [bg addSubview:self.displayLabel];
+    // ═══ 文字区域（旋转90°以适配横屏阅读） ═══
+    // 在portrait坐标系中，文字容器高150（变成横屏的"宽度"）
+    UIView *textContainer = [[UIView alloc] initWithFrame:CGRectMake(0, 80, w, 150)];
+    textContainer.backgroundColor = [UIColor clearColor];
 
-    // 拖动手势（仅 y 轴）
+    // 创建label，宽度150（横屏时的文字行长）
+    self.displayLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 150, w)];
+    self.displayLabel.textColor = [UIColor colorWithWhite:0.96 alpha:1.0];
+    self.displayLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
+    self.displayLabel.numberOfLines = 1;
+    self.displayLabel.textAlignment = NSTextAlignmentCenter;
+    self.displayLabel.text = @"AI决策：｜等待识别...";
+
+    // 旋转90°（逆时针），横屏时文字从左到右正常阅读
+    self.displayLabel.transform = CGAffineTransformMakeRotation(-M_PI_2);
+    self.displayLabel.center = CGPointMake(textContainer.bounds.size.width / 2,
+                                           textContainer.bounds.size.height / 2);
+    [textContainer addSubview:self.displayLabel];
+    [bg addSubview:textContainer];
+
+    // ═══ 底部分隔线 ═══
+    UIView *sep2 = [[UIView alloc] initWithFrame:CGRectMake(14, h - 10, w - 28, 1)];
+    sep2.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.08];
+    [bg addSubview:sep2];
+
+    // ═══ 拖动手势（仅 y 轴） ═══
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     [bg addGestureRecognizer:pan];
 
-    // 游戏状态
+    // ═══ 游戏状态管理 ═══
     self.gameManager = [[GameStateManager alloc] init];
     __weak typeof(self) weakSelf = self;
     self.gameManager.onResultUpdate = ^(NSString *result) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            // 短文本换行显示
-            NSString *formatted = [result stringByReplacingOccurrencesOfString:@" " withString:@"\n"];
-            weakSelf.displayLabel.text = formatted;
+            // 格式化为单行："AI决策：｜结果"
+            weakSelf.displayLabel.text = [NSString stringWithFormat:@"AI决策：｜%@", result];
 
-            // 指示点闪烁
-            [UIView animateWithDuration:0.15 animations:^{
-                weakSelf.indicatorDot.alpha = 0.3;
-            } completion:^(BOOL finished) {
-                [UIView animateWithDuration:0.15 animations:^{
-                    weakSelf.indicatorDot.alpha = 1.0;
-                }];
-            }];
+            // 指示点脉冲动画
+            [weakSelf pulseIndicator];
         });
     };
 
     return self;
 }
 
+- (void)pulseIndicator {
+    // 移除旧动画
+    [self.indicatorDot.layer removeAllAnimations];
+
+    // 缩放+透明度脉冲
+    CAKeyframeAnimation *pulse = [CAKeyframeAnimation animationWithKeyPath:@"transform.scale"];
+    pulse.values = @[@1.0, @1.4, @1.0];
+    pulse.keyTimes = @[@0, @0.5, @1.0];
+    pulse.duration = 0.4;
+
+    CAKeyframeAnimation *fade = [CAKeyframeAnimation animationWithKeyPath:@"opacity"];
+    fade.values = @[@0.7, @1.0, @0.7];
+    fade.keyTimes = @[@0, @0.5, @1.0];
+    fade.duration = 0.4;
+
+    CAAnimationGroup *group = [CAAnimationGroup animation];
+    group.animations = @[pulse, fade];
+    group.duration = 0.4;
+
+    [self.indicatorDot.layer addAnimation:group forKey:@"pulse"];
+}
+
 - (void)show {
     self.hidden = NO;
     [self makeKeyAndVisible];
     [self.gameManager startMonitoring];
+
+    // 入场动画
+    self.alpha = 0;
+    self.transform = CGAffineTransformMakeTranslation(30, 0);
+    [UIView animateWithDuration:0.4 delay:0 usingSpringWithDamping:0.75 initialSpringVelocity:0.5 options:0 animations:^{
+        self.alpha = 1;
+        self.transform = CGAffineTransformIdentity;
+    } completion:nil];
 }
 
 - (void)hide {
     [self.gameManager stopMonitoring];
-    self.hidden = YES;
+
+    // 退场动画
+    [UIView animateWithDuration:0.25 animations:^{
+        self.alpha = 0;
+        self.transform = CGAffineTransformMakeTranslation(30, 0);
+    } completion:^(BOOL finished) {
+        self.hidden = YES;
+        self.transform = CGAffineTransformIdentity;
+    }];
 }
 
 // 只允许上下拖动，x 始终贴在右边缘
