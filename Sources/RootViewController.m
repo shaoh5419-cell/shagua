@@ -5,6 +5,7 @@
 #import <signal.h>
 #import <errno.h>
 #import "PersonaHelpers.h"
+#import "LogWindow.h"
 
 extern char **environ;
 
@@ -137,6 +138,16 @@ extern char **environ;
     // ── 初始化状态 ──
     self.isRunning = [self isHUDRunning];
     [self refreshVisuals:NO];
+
+    // ── 日志按钮 ──
+    UIButton *logBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    logBtn.frame = CGRectMake(20, self.view.bounds.size.height - 50, 60, 35);
+    logBtn.backgroundColor = [UIColor colorWithRed:0.2 green:0.6 blue:0.2 alpha:0.8];
+    logBtn.layer.cornerRadius = 6;
+    [logBtn setTitle:@"日志" forState:UIControlStateNormal];
+    logBtn.titleLabel.font = [UIFont systemFontOfSize:12];
+    [logBtn addTarget:self action:@selector(showLogWindow) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:logBtn];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -340,6 +351,10 @@ extern char **environ;
     } else {
         update();
     }
+}
+
+- (void)showLogWindow {
+    [[LogWindow shared] show];
 }
 
 @end
