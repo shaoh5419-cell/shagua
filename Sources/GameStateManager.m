@@ -60,8 +60,11 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 - (void)captureAndAnalyze {
     [self captureScreen:^(UIImage *screenshot) {
         if (!screenshot) {
+            if (self.onResultUpdate) self.onResultUpdate(@"截屏失败");
             return;
         }
+
+        if (self.onResultUpdate) self.onResultUpdate(@"识别中...");
 
         // 根据阶段调整识别区域
         UIImage *centerArea = [self cropImage:screenshot toRect:[self getCenterROI:screenshot]];
@@ -76,6 +79,12 @@ typedef NS_ENUM(NSInteger, GamePhase) {
                 }
                 self.lastRecognizedText = combinedText;
                 self.lastRecognitionTime = [[NSDate date] timeIntervalSince1970];
+
+                // 显示识别结果用于测试
+                NSString *debugMsg = [NSString stringWithFormat:@"中:%@|手:%@",
+                    centerText.length > 0 ? [centerText substringToIndex:MIN(5, centerText.length)] : @"无",
+                    handText.length > 0 ? [handText substringToIndex:MIN(5, handText.length)] : @"无"];
+                if (self.onResultUpdate) self.onResultUpdate(debugMsg);
 
                 [self processOCRResult:centerText handText:handText screenshot:screenshot];
             }];
@@ -117,6 +126,11 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 
     // 规范化文本用于判断
     NSString *normalizedCenter = [centerText lowercaseString];
+
+    // 显示识别的卡牌
+    if (extractedCards.length > 0) {
+        if (self.onResultUpdate) self.onResultUpdate([NSString stringWithFormat:@"手牌:%@", extractedCards]);
+    }
 
     if ([normalizedCenter containsString:@"叫地主"] || [normalizedCenter containsString:@"抢地主"]) {
         self.currentPhase = GamePhaseLandlord;
