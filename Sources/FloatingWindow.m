@@ -7,7 +7,8 @@
 @property (nonatomic, strong) UIView *containerView;
 @property (nonatomic, strong) GameStateManager *gameManager;
 @property (nonatomic, strong) UIViewController *rootVC;
-@property (nonatomic, assign) CGPoint dragOffset;
+@property (nonatomic, strong) UIPanGestureRecognizer *panGesture;
+@property (nonatomic, assign) CGFloat initialY;
 @end
 
 @implementation FloatingWindow
@@ -119,6 +120,10 @@
     [textContainer addSubview:self.displayLabel];
     [container addSubview:textContainer];
 
+    // ═══ 拖动手势 ═══
+    self.panGesture = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
+    [container addGestureRecognizer:self.panGesture];
+
     // ═══ 游戏状态管理 ═══
     self.gameManager = [[GameStateManager alloc] init];
     __weak typeof(self) weakSelf = self;
@@ -152,6 +157,23 @@
     [self.statusIndicator.layer addAnimation:group forKey:@"pulse"];
 }
 
+- (void)handlePan:(UIPanGestureRecognizer *)gesture {
+    CGRect screen = [UIScreen mainScreen].bounds;
+
+    if (gesture.state == UIGestureRecognizerStateBegan) {
+        self.initialY = self.frame.origin.y;
+    }
+    else if (gesture.state == UIGestureRecognizerStateChanged) {
+        CGFloat translation = [gesture translationInView:self].y;
+        CGFloat newY = self.initialY + translation;
+        newY = MAX(0, MIN(newY, screen.size.height - self.frame.size.height));
+
+        CGRect newFrame = self.frame;
+        newFrame.origin.y = newY;
+        self.frame = newFrame;
+    }
+}
+
 - (void)show {
     self.hidden = NO;
     [self makeKeyAndVisible];
@@ -176,43 +198,6 @@
         self.hidden = YES;
         self.transform = CGAffineTransformIdentity;
     }];
-}
-
-#pragma mark - 触摸拖动（重写UIWindow的触摸方法）
-
-- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    UITouch *touch = [touches anyObject];
-    CGPoint location = [touch locationInView:self];
-    self.dragOffset = location;
-}
-
-- (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    UITouch *touch = [touches anyObject];
-    CGPoint location = [touch locationInView:self.superview ?: [UIScreen mainScreen].coordinateSpace];
-
-    CGRect screen = [UIScreen mainScreen].bounds;
-    CGFloat newY = location.y - self.dragOffset.y;
-
-    // 限制在屏幕范围内
-    newY = MAX(0, MIN(newY, screen.size.height - self.frame.size.height));
-
-    // x锁定在右边缘
-    self.frame = CGRectMake(screen.size.width - self.frame.size.width,
-                            newY,
-                            self.frame.size.width,
-                            self.frame.size.height);
-}
-
-- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    self.dragOffset = CGPointZero;
-}
-
-- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    self.dragOffset = CGPointZero;
-}
-
-- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
-    return CGRectContainsPoint(self.bounds, point);
 }
 
 @end
