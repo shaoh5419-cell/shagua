@@ -3,7 +3,6 @@
 
 @interface FloatingWindow ()
 @property (nonatomic, strong) UILabel *displayLabel;
-@property (nonatomic, strong) UIView *indicatorDot;
 @property (nonatomic, strong) GameStateManager *gameManager;
 @property (nonatomic, strong) UIViewController *rootVC;
 @end
@@ -18,12 +17,11 @@
 - (instancetype)init {
     CGRect screen = [UIScreen mainScreen].bounds;
     CGFloat w = 200;
-    CGFloat h = 68;
+    CGFloat h = 64;
 
-    // 横屏左旋（home在左）时，portrait右侧 = landscape右侧上方
-    // 初始位置：portrait右边缘，垂直居中偏上；可拖动调整
-    CGFloat x = screen.size.width - w - 10;
-    CGFloat y = screen.size.height * 0.35 - h / 2;
+    // 贴紧 portrait 右边缘；只在 y 方向可拖动
+    CGFloat x = screen.size.width - w;
+    CGFloat y = screen.size.height * 0.38 - h / 2;
 
     self = [super initWithFrame:CGRectMake(x, y, w, h)];
     if (!self) return nil;
@@ -36,45 +34,44 @@
     self.rootVC.view.backgroundColor = [UIColor clearColor];
     self.rootViewController = self.rootVC;
 
-    // 主背景：深色磨砂胶囊
+    // 背景：右侧贴边所以只圆左两角，制造"嵌入屏幕边缘"的视感
     UIView *bg = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, h)];
-    bg.backgroundColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.10 alpha:0.92];
+    bg.backgroundColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.12 alpha:0.94];
     bg.layer.cornerRadius = h / 2;
+    bg.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMinXMaxYCorner;
     bg.layer.borderWidth = 1.0;
-    bg.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.10].CGColor;
-    // 投影
+    bg.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.12].CGColor;
     bg.layer.shadowColor = [UIColor blackColor].CGColor;
-    bg.layer.shadowOffset = CGSizeMake(0, 4);
-    bg.layer.shadowRadius = 10;
-    bg.layer.shadowOpacity = 0.5;
+    bg.layer.shadowOffset = CGSizeMake(-3, 3);
+    bg.layer.shadowRadius = 8;
+    bg.layer.shadowOpacity = 0.55;
     [self.rootVC.view addSubview:bg];
 
-    // 左侧彩色指示条
+    // 左侧彩条（圆角，配合背景）
     UIView *stripe = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 4, h)];
-    stripe.backgroundColor = [UIColor colorWithRed:0.20 green:0.75 blue:1.0 alpha:1.0];
-    // 左侧胶囊圆角裁剪
-    UIView *stripeWrap = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 16, h)];
+    stripe.backgroundColor = [UIColor colorWithRed:0.18 green:0.72 blue:1.0 alpha:1.0];
+    UIView *stripeWrap = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 14, h)];
     stripeWrap.clipsToBounds = YES;
     stripeWrap.layer.cornerRadius = h / 2;
     stripeWrap.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMinXMaxYCorner;
     [stripeWrap addSubview:stripe];
     [bg addSubview:stripeWrap];
 
-    // "AI" 小标签
-    UILabel *aiLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 0, 28, h)];
+    // "AI" 标签
+    UILabel *aiLabel = [[UILabel alloc] initWithFrame:CGRectMake(8, 0, 28, h)];
     aiLabel.text = @"AI";
-    aiLabel.textColor = [UIColor colorWithRed:0.20 green:0.75 blue:1.0 alpha:1.0];
+    aiLabel.textColor = [UIColor colorWithRed:0.18 green:0.72 blue:1.0 alpha:1.0];
     aiLabel.font = [UIFont boldSystemFontOfSize:11];
     aiLabel.textAlignment = NSTextAlignmentCenter;
     [bg addSubview:aiLabel];
 
-    // 分隔线
-    UIView *sep = [[UIView alloc] initWithFrame:CGRectMake(38, 12, 1, h - 24)];
+    // 竖分隔线
+    UIView *sep = [[UIView alloc] initWithFrame:CGRectMake(36, 12, 1, h - 24)];
     sep.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.12];
     [bg addSubview:sep];
 
-    // 主文本标签
-    self.displayLabel = [[UILabel alloc] initWithFrame:CGRectMake(46, 0, w - 54, h)];
+    // 主文本
+    self.displayLabel = [[UILabel alloc] initWithFrame:CGRectMake(44, 0, w - 50, h)];
     self.displayLabel.textColor = [UIColor colorWithWhite:0.95 alpha:1.0];
     self.displayLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
     self.displayLabel.numberOfLines = 2;
@@ -82,11 +79,11 @@
     self.displayLabel.text = @"等待识别...";
     [bg addSubview:self.displayLabel];
 
-    // 拖动手势
+    // 拖动手势（仅 y 轴）
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     [bg addGestureRecognizer:pan];
 
-    // 游戏状态管理
+    // 游戏状态
     self.gameManager = [[GameStateManager alloc] init];
     __weak typeof(self) weakSelf = self;
     self.gameManager.onResultUpdate = ^(NSString *result) {
@@ -109,13 +106,17 @@
     self.hidden = YES;
 }
 
+// 只允许上下拖动，x 始终贴在右边缘
 - (void)handlePan:(UIPanGestureRecognizer *)gesture {
     CGPoint delta = [gesture translationInView:self];
     CGRect screen = [UIScreen mainScreen].bounds;
-    CGPoint c = self.center;
-    c.x = MAX(self.frame.size.width / 2, MIN(c.x + delta.x, screen.size.width - self.frame.size.width / 2));
-    c.y = MAX(self.frame.size.height / 2, MIN(c.y + delta.y, screen.size.height - self.frame.size.height / 2));
-    self.center = c;
+    CGFloat newY = self.frame.origin.y + delta.y;
+    newY = MAX(0, MIN(newY, screen.size.height - self.frame.size.height));
+    // x 锁定在右边缘
+    self.frame = CGRectMake(screen.size.width - self.frame.size.width,
+                            newY,
+                            self.frame.size.width,
+                            self.frame.size.height);
     [gesture setTranslation:CGPointZero inView:self];
 }
 

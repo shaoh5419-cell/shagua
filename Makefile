@@ -16,6 +16,7 @@ DDZHelper_CODESIGN_FLAGS = -SResources/entitlements.plist
 include $(THEOS_MAKE_PATH)/application.mk
 
 after-DDZHelper-stage::
+	$(ECHO_NOTHING)python3 make_icon.py$(ECHO_END)
 	$(ECHO_NOTHING)mkdir -p $(THEOS_STAGING_DIR)/Applications/DDZHelper.app$(ECHO_END)
 	$(ECHO_NOTHING)cp -r Resources/* $(THEOS_STAGING_DIR)/Applications/DDZHelper.app/$(ECHO_END)
 	$(ECHO_NOTHING)mkdir -p $(THEOS_STAGING_DIR)/Library/LaunchDaemons$(ECHO_END)
