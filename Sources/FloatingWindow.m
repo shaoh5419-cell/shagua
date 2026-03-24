@@ -22,9 +22,9 @@
     self = [super initWithFrame:frame];
 
     if (self) {
-        self.frame = frame;
-        self.windowLevel = UIWindowLevelStatusBar + 100;
+        self.windowLevel = 10000010.0;  // 使用TrollSpeed相同的超高level
         self.backgroundColor = [UIColor clearColor];
+        self.opaque = NO;
 
         self.rootVC = [[UIViewController alloc] init];
         self.rootViewController = self.rootVC;
