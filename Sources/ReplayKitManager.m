@@ -1,5 +1,10 @@
 #import "ReplayKitManager.h"
 
+// 私有API声明 - 用于截取整个屏幕
+@interface UIScreen (Private)
+- (CGImageRef)_createSnapshotWithRect:(CGRect)rect;
+@end
+
 @interface ReplayKitManager ()
 @property (nonatomic, strong) RPScreenRecorder *recorder;
 @end
@@ -52,17 +57,40 @@
 }
 
 - (void)captureScreenshot:(void(^)(UIImage *image))completion {
-    if (@available(iOS 11.0, *)) {
-        // ReplayKit 2: captureScreenshot 可以截取整个屏幕
-        [self.recorder captureScreenshotWithCompletion:^(UIImage * _Nullable screenshot, NSError * _Nullable error) {
-            if (error) {
-                NSLog(@"ReplayKit 2 截屏失败: %@", error);
-                if (completion) completion(nil);
-            } else {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIScreen *screen = [UIScreen mainScreen];
+        CGRect screenRect = screen.bounds;
+
+        // 使用私有API截取整个屏幕（包括其他应用）
+        if ([screen respondsToSelector:@selector(_createSnapshotWithRect:)]) {
+            CGImageRef cgImage = [screen _createSnapshotWithRect:screenRect];
+            if (cgImage) {
+                UIImage *screenshot = [UIImage imageWithCGImage:cgImage];
+                CGImageRelease(cgImage);
                 if (completion) completion(screenshot);
+                return;
             }
-        }];
-    }
+        }
+
+        // 降级方案：使用 UIGraphics 截屏
+        UIGraphicsBeginImageContextWithOptions(screenRect.size, NO, screen.scale);
+        CGContextRef context = UIGraphicsGetCurrentContext();
+        if (!context) {
+            UIGraphicsEndImageContext();
+            if (completion) completion(nil);
+            return;
+        }
+
+        for (UIWindow *window in [UIApplication sharedApplication].windows) {
+            if (window.windowLevel < 10000000) {
+                [window.layer renderInContext:context];
+            }
+        }
+        UIImage *screenshot = UIGraphicsGetImageFromCurrentImageContext();
+        UIGraphicsEndImageContext();
+
+        if (completion) completion(screenshot);
+    });
 }
 
 @end
