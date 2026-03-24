@@ -1,7 +1,6 @@
 #import "GameStateManager.h"
 #import "OCRManager.h"
 #import "AIManager.h"
-#import "DebugWindow.h"
 #import <UIKit/UIKit.h>
 #import <CoreGraphics/CoreGraphics.h>
 
@@ -43,11 +42,19 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 
 - (void)startMonitoring {
     self.currentPhase = GamePhaseLandlord;
-    [[DebugWindow shared] show];
-    [[DebugWindow shared] log:@"开始监控"];
     if (self.onResultUpdate) self.onResultUpdate(@"监控中...");
     self.monitorTimer = [NSTimer scheduledTimerWithTimeInterval:2.0 target:self selector:@selector(captureAndAnalyze) userInfo:nil repeats:YES];
     [self captureAndAnalyze];
+}
+
+- (void)showAlert:(NSString *)message {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"调试信息" message:message preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+
+        UIViewController *rootVC = [UIApplication sharedApplication].keyWindow.rootViewController;
+        [rootVC presentViewController:alert animated:YES completion:nil];
+    });
 }
 
 - (void)stopMonitoring {
@@ -56,15 +63,11 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (void)captureAndAnalyze {
-    [[DebugWindow shared] log:@"开始截屏"];
-
     [self captureScreen:^(UIImage *screenshot) {
         if (!screenshot) {
-            [[DebugWindow shared] log:@"截屏失败"];
+            [self showAlert:@"截屏失败"];
             return;
         }
-
-        [[DebugWindow shared] log:[NSString stringWithFormat:@"截屏成功 %.0fx%.0f", screenshot.size.width, screenshot.size.height]];
 
         CGFloat screenHeight = screenshot.size.height;
         CGFloat screenWidth = screenshot.size.width;
@@ -75,12 +78,13 @@ typedef NS_ENUM(NSInteger, GamePhase) {
         CGRect centerRect = CGRectMake(screenWidth * 0.2, screenHeight * 0.3, screenWidth * 0.6, screenHeight * 0.4);
         UIImage *centerArea = [self cropImage:screenshot toRect:centerRect];
 
-        [[DebugWindow shared] log:@"开始OCR识别"];
-
         [[OCRManager shared] recognizeImage:centerArea completion:^(NSString *centerText) {
             [[OCRManager shared] recognizeImage:handArea completion:^(NSString *handText) {
-                [[DebugWindow shared] log:[NSString stringWithFormat:@"中央: %@", centerText.length > 0 ? centerText : @"无"]];
-                [[DebugWindow shared] log:[NSString stringWithFormat:@"手牌: %@", handText.length > 0 ? handText : @"无"]];
+                NSString *msg = [NSString stringWithFormat:@"截屏: %.0fx%.0f\n中央: %@\n手牌: %@",
+                                screenshot.size.width, screenshot.size.height,
+                                centerText.length > 0 ? centerText : @"无",
+                                handText.length > 0 ? handText : @"无"];
+                [self showAlert:msg];
                 [self processOCRResult:centerText handText:handText screenshot:screenshot];
             }];
         }];
@@ -99,28 +103,21 @@ typedef NS_ENUM(NSInteger, GamePhase) {
         UIScreen *screen = [UIScreen mainScreen];
         CGRect screenRect = screen.bounds;
 
-        [[DebugWindow shared] log:[NSString stringWithFormat:@"屏幕尺寸: %.0fx%.0f", screenRect.size.width, screenRect.size.height]];
-
         // 使用私有API截取整个屏幕
         if ([screen respondsToSelector:@selector(_createSnapshotWithRect:)]) {
             CGImageRef cgImage = [screen _createSnapshotWithRect:screenRect];
             if (cgImage) {
                 UIImage *screenshot = [UIImage imageWithCGImage:cgImage];
                 CGImageRelease(cgImage);
-                [[DebugWindow shared] log:@"私有API截屏成功"];
                 if (completion) completion(screenshot);
                 return;
             }
-            [[DebugWindow shared] log:@"私有API截屏失败"];
-        } else {
-            [[DebugWindow shared] log:@"私有API不可用"];
         }
 
         // 降级方案
         UIGraphicsBeginImageContextWithOptions(screenRect.size, NO, screen.scale);
         CGContextRef context = UIGraphicsGetCurrentContext();
         if (!context) {
-            [[DebugWindow shared] log:@"创建图形上下文失败"];
             UIGraphicsEndImageContext();
             if (completion) completion(nil);
             return;
@@ -134,26 +131,21 @@ typedef NS_ENUM(NSInteger, GamePhase) {
         UIImage *screenshot = UIGraphicsGetImageFromCurrentImageContext();
         UIGraphicsEndImageContext();
 
-        [[DebugWindow shared] log:screenshot ? @"降级方案成功" : @"降级方案失败"];
         if (completion) completion(screenshot);
     });
 }
 
 - (void)processOCRResult:(NSString *)centerText handText:(NSString *)handText screenshot:(UIImage *)screenshot {
     NSString *extractedCards = [self extractCards:handText];
-    [[DebugWindow shared] log:[NSString stringWithFormat:@"提取: %@", extractedCards.length > 0 ? extractedCards : @"无"]];
 
     if ([centerText containsString:@"叫地主"] || [centerText containsString:@"抢地主"]) {
         self.currentPhase = GamePhaseLandlord;
-        [[DebugWindow shared] log:@"阶段: 叫地主"];
         [self handleLandlordPhase:extractedCards];
     } else if ([centerText containsString:@"加倍"]) {
         self.currentPhase = GamePhaseDouble;
-        [[DebugWindow shared] log:@"阶段: 加倍"];
         [self handleDoublePhase:centerText screenshot:screenshot];
     } else if (extractedCards.length > 0) {
         self.currentPhase = GamePhasePlay;
-        [[DebugWindow shared] log:@"阶段: 出牌"];
         [self handlePlayPhase:extractedCards];
     } else {
         if (self.onResultUpdate) self.onResultUpdate(@"等待中...");
