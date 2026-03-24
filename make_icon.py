@@ -85,11 +85,18 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 res_dir = os.path.join(script_dir, 'Resources')
 os.makedirs(res_dir, exist_ok=True)
 
-# 生成 @2x 和 @3x 图标
-for name, size in [('AppIcon@2x.png', 120), ('AppIcon@3x.png', 180)]:
+# 生成多个尺寸（包括多任务切换器用的小图标）
+sizes = [
+    ('AppIcon40x40@2x.png', 80),   # 多任务切换器
+    ('AppIcon40x40@3x.png', 120),  # 多任务切换器
+    ('AppIcon60x60@2x.png', 120),  # 主屏幕
+    ('AppIcon60x60@3x.png', 180),  # 主屏幕
+]
+
+for name, size in sizes:
     path = os.path.join(res_dir, name)
     with open(path, 'wb') as f:
         f.write(make_icon(size))
-    print(f"Generated {name} ({size}×{size})")
+    print(f"Generated {name} ({size}x{size})")
 
-print("✓ App icons generated successfully")
+print("App icons generated successfully")
