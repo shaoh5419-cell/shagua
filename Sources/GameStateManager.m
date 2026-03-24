@@ -95,27 +95,42 @@ typedef NS_ENUM(NSInteger, GamePhase) {
         UIScreen *screen = [UIScreen mainScreen];
         CGRect screenRect = screen.bounds;
 
+        NSLog(@"开始截屏，屏幕尺寸: %.0fx%.0f", screenRect.size.width, screenRect.size.height);
+
         // 使用私有API截取整个屏幕
         if ([screen respondsToSelector:@selector(_createSnapshotWithRect:)]) {
             CGImageRef cgImage = [screen _createSnapshotWithRect:screenRect];
             if (cgImage) {
                 UIImage *screenshot = [UIImage imageWithCGImage:cgImage];
                 CGImageRelease(cgImage);
+                NSLog(@"私有API截屏成功");
                 if (completion) completion(screenshot);
                 return;
             }
+            NSLog(@"私有API截屏失败");
+        } else {
+            NSLog(@"私有API不可用");
         }
 
         // 降级方案：截取所有窗口
         UIGraphicsBeginImageContextWithOptions(screenRect.size, NO, screen.scale);
+        CGContextRef context = UIGraphicsGetCurrentContext();
+        if (!context) {
+            NSLog(@"创建图形上下文失败");
+            UIGraphicsEndImageContext();
+            if (completion) completion(nil);
+            return;
+        }
+
         for (UIWindow *window in [UIApplication sharedApplication].windows) {
             if (window.windowLevel < 10000000) {  // 排除悬浮窗
-                [window drawViewHierarchyInRect:window.bounds afterScreenUpdates:NO];
+                [window.layer renderInContext:context];
             }
         }
         UIImage *screenshot = UIGraphicsGetImageFromCurrentImageContext();
         UIGraphicsEndImageContext();
 
+        NSLog(@"降级方案截屏: %@", screenshot ? @"成功" : @"失败");
         if (completion) completion(screenshot);
     });
 }
