@@ -19,56 +19,55 @@
     }
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        // 设置超时：5秒后如果还没完成就返回空
-        __block BOOL completed = NO;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            if (!completed) {
-                completed = YES;
-                if (completion) completion(@"");
-            }
-        });
+        @try {
+            VNRecognizeTextRequest *request = [[VNRecognizeTextRequest alloc] initWithCompletionHandler:^(VNRequest *request, NSError *error) {
+                if (error) {
+                    NSLog(@"OCR错误: %@", error);
+                    if (completion) completion(@"");
+                    return;
+                }
 
-        VNRecognizeTextRequest *request = [[VNRecognizeTextRequest alloc] initWithCompletionHandler:^(VNRequest *request, NSError *error) {
-            if (completed) return;
-            completed = YES;
+                NSMutableString *text = [NSMutableString string];
+                if (request.results && request.results.count > 0) {
+                    for (VNRecognizedTextObservation *observation in request.results) {
+                        VNRecognizedText *topCandidate = [observation topCandidates:1].firstObject;
+                        if (topCandidate) {
+                            [text appendString:topCandidate.string];
+                            [text appendString:@" "];
+                        }
+                    }
+                }
 
-            if (error) {
-                NSLog(@"OCR错误: %@", error);
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (completion) completion(text.length > 0 ? text : @"");
+                });
+            }];
+
+            // 使用快速识别模式
+            request.recognitionLevel = VNRequestTextRecognitionLevelFast;
+            request.recognitionLanguages = @[@"zh-Hans"];
+            request.usesLanguageCorrection = NO;
+
+            if (!image.CGImage) {
                 if (completion) completion(@"");
                 return;
             }
 
-            NSMutableString *text = [NSMutableString string];
-            for (VNRecognizedTextObservation *observation in request.results) {
-                VNRecognizedText *topCandidate = [observation topCandidates:1].firstObject;
-                if (topCandidate) {
-                    [text appendString:topCandidate.string];
-                    [text appendString:@" "];
-                }
-            }
+            VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCGImage:image.CGImage options:@{}];
+            NSError *error = nil;
+            BOOL success = [handler performRequests:@[request] error:&error];
 
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (completion) completion(text);
-            });
-        }];
-
-        // 使用快速识别模式
-        request.recognitionLevel = VNRequestTextRecognitionLevelFast;
-        request.recognitionLanguages = @[@"zh-Hans"];
-        request.usesLanguageCorrection = NO;
-
-        VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCGImage:image.CGImage options:@{}];
-        NSError *error = nil;
-        [handler performRequests:@[request] error:&error];
-
-        if (error) {
-            NSLog(@"OCR执行错误: %@", error);
-            if (!completed) {
-                completed = YES;
+            if (!success || error) {
+                NSLog(@"OCR执行错误: %@", error);
                 dispatch_async(dispatch_get_main_queue(), ^{
                     if (completion) completion(@"");
                 });
             }
+        } @catch (NSException *exception) {
+            NSLog(@"OCR异常: %@", exception);
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (completion) completion(@"");
+            });
         }
     });
 }

@@ -58,33 +58,39 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (void)captureAndAnalyze {
+    if (self.onResultUpdate) self.onResultUpdate(@"开始截屏");
+
     [self captureScreen:^(UIImage *screenshot) {
         if (!screenshot) {
             if (self.onResultUpdate) self.onResultUpdate(@"截屏失败");
             return;
         }
 
+        if (self.onResultUpdate) self.onResultUpdate([NSString stringWithFormat:@"截屏成功:%ldx%ld", (long)screenshot.size.width, (long)screenshot.size.height]);
+
         // 根据阶段调整识别区域
-        UIImage *centerArea = [self cropImage:screenshot toRect:[self getCenterROI:screenshot]];
-        UIImage *handArea = [self cropImage:screenshot toRect:[self getHandROI:screenshot]];
+        CGRect centerROI = [self getCenterROI:screenshot];
+        CGRect handROI = [self getHandROI:screenshot];
+
+        if (self.onResultUpdate) self.onResultUpdate([NSString stringWithFormat:@"中央ROI:%.0fx%.0f", centerROI.size.width, centerROI.size.height]);
+
+        UIImage *centerArea = [self cropImage:screenshot toRect:centerROI];
+        UIImage *handArea = [self cropImage:screenshot toRect:handROI];
+
+        if (!centerArea || !handArea) {
+            if (self.onResultUpdate) self.onResultUpdate(@"裁剪失败");
+            return;
+        }
+
+        if (self.onResultUpdate) self.onResultUpdate(@"开始OCR识别");
 
         // 先识别中央
         [[OCRManager shared] recognizeImage:centerArea completion:^(NSString *centerText) {
-            // 实时显示中央识别结果
-            if (centerText.length > 0) {
-                if (self.onResultUpdate) {
-                    self.onResultUpdate([NSString stringWithFormat:@"中:%@", centerText]);
-                }
-            }
+            if (self.onResultUpdate) self.onResultUpdate([NSString stringWithFormat:@"中央OCR完成:%@", centerText.length > 0 ? centerText : @"空"]);
 
             // 再识别手牌
             [[OCRManager shared] recognizeImage:handArea completion:^(NSString *handText) {
-                // 实时显示手牌识别结果
-                if (handText.length > 0) {
-                    if (self.onResultUpdate) {
-                        self.onResultUpdate([NSString stringWithFormat:@"手:%@", handText]);
-                    }
-                }
+                if (self.onResultUpdate) self.onResultUpdate([NSString stringWithFormat:@"手牌OCR完成:%@", handText.length > 0 ? handText : @"空"]);
 
                 // 去重：避免重复识别相同内容
                 NSString *combinedText = [NSString stringWithFormat:@"%@|%@", centerText, handText];
