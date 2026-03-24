@@ -63,11 +63,16 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (void)captureAndAnalyze {
+    // 立即显示测试弹窗
+    [self showAlert:@"captureAndAnalyze 被调用"];
+
     [self captureScreen:^(UIImage *screenshot) {
         if (!screenshot) {
             [self showAlert:@"截屏失败"];
             return;
         }
+
+        [self showAlert:[NSString stringWithFormat:@"截屏成功: %.0fx%.0f", screenshot.size.width, screenshot.size.height]];
 
         CGFloat screenHeight = screenshot.size.height;
         CGFloat screenWidth = screenshot.size.width;
@@ -80,8 +85,7 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 
         [[OCRManager shared] recognizeImage:centerArea completion:^(NSString *centerText) {
             [[OCRManager shared] recognizeImage:handArea completion:^(NSString *handText) {
-                NSString *msg = [NSString stringWithFormat:@"截屏: %.0fx%.0f\n中央: %@\n手牌: %@",
-                                screenshot.size.width, screenshot.size.height,
+                NSString *msg = [NSString stringWithFormat:@"中央: %@\n手牌: %@",
                                 centerText.length > 0 ? centerText : @"无",
                                 handText.length > 0 ? handText : @"无"];
                 [self showAlert:msg];
