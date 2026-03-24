@@ -1,6 +1,7 @@
 #import "GameStateManager.h"
 #import "OCRManager.h"
 #import "AIManager.h"
+#import "DebugWindow.h"
 #import <UIKit/UIKit.h>
 #import <CoreGraphics/CoreGraphics.h>
 
@@ -42,9 +43,11 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 
 - (void)startMonitoring {
     self.currentPhase = GamePhaseLandlord;
-    if (self.onResultUpdate) self.onResultUpdate(@"开始监控...");
+    [[DebugWindow shared] show];
+    [[DebugWindow shared] log:@"开始监控"];
+    if (self.onResultUpdate) self.onResultUpdate(@"监控中...");
     self.monitorTimer = [NSTimer scheduledTimerWithTimeInterval:2.0 target:self selector:@selector(captureAndAnalyze) userInfo:nil repeats:YES];
-    [self captureAndAnalyze];  // 立即执行一次
+    [self captureAndAnalyze];
 }
 
 - (void)stopMonitoring {
@@ -53,30 +56,31 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (void)captureAndAnalyze {
-    if (self.onResultUpdate) self.onResultUpdate(@"正在截屏...");
+    [[DebugWindow shared] log:@"开始截屏"];
 
     [self captureScreen:^(UIImage *screenshot) {
         if (!screenshot) {
-            if (self.onResultUpdate) self.onResultUpdate(@"截屏失败");
+            [[DebugWindow shared] log:@"截屏失败"];
             return;
         }
 
-        if (self.onResultUpdate) self.onResultUpdate(@"截屏成功，识别中...");
+        [[DebugWindow shared] log:[NSString stringWithFormat:@"截屏成功 %.0fx%.0f", screenshot.size.width, screenshot.size.height]];
 
         CGFloat screenHeight = screenshot.size.height;
         CGFloat screenWidth = screenshot.size.width;
 
-        // 识别手牌区域（底部 25%，这里通常显示手牌）
         CGRect handRect = CGRectMake(0, screenHeight * 0.75, screenWidth, screenHeight * 0.25);
         UIImage *handArea = [self cropImage:screenshot toRect:handRect];
 
-        // 识别中央区域（用于判断游戏阶段和底牌）
         CGRect centerRect = CGRectMake(screenWidth * 0.2, screenHeight * 0.3, screenWidth * 0.6, screenHeight * 0.4);
         UIImage *centerArea = [self cropImage:screenshot toRect:centerRect];
 
+        [[DebugWindow shared] log:@"开始OCR识别"];
+
         [[OCRManager shared] recognizeImage:centerArea completion:^(NSString *centerText) {
             [[OCRManager shared] recognizeImage:handArea completion:^(NSString *handText) {
-                if (self.onResultUpdate) self.onResultUpdate(@"OCR完成，分析中...");
+                [[DebugWindow shared] log:[NSString stringWithFormat:@"中央: %@", centerText.length > 0 ? centerText : @"无"]];
+                [[DebugWindow shared] log:[NSString stringWithFormat:@"手牌: %@", handText.length > 0 ? handText : @"无"]];
                 [self processOCRResult:centerText handText:handText screenshot:screenshot];
             }];
         }];
@@ -95,7 +99,7 @@ typedef NS_ENUM(NSInteger, GamePhase) {
         UIScreen *screen = [UIScreen mainScreen];
         CGRect screenRect = screen.bounds;
 
-        NSLog(@"开始截屏，屏幕尺寸: %.0fx%.0f", screenRect.size.width, screenRect.size.height);
+        [[DebugWindow shared] log:[NSString stringWithFormat:@"屏幕尺寸: %.0fx%.0f", screenRect.size.width, screenRect.size.height]];
 
         // 使用私有API截取整个屏幕
         if ([screen respondsToSelector:@selector(_createSnapshotWithRect:)]) {
@@ -103,60 +107,56 @@ typedef NS_ENUM(NSInteger, GamePhase) {
             if (cgImage) {
                 UIImage *screenshot = [UIImage imageWithCGImage:cgImage];
                 CGImageRelease(cgImage);
-                NSLog(@"私有API截屏成功");
+                [[DebugWindow shared] log:@"私有API截屏成功"];
                 if (completion) completion(screenshot);
                 return;
             }
-            NSLog(@"私有API截屏失败");
+            [[DebugWindow shared] log:@"私有API截屏失败"];
         } else {
-            NSLog(@"私有API不可用");
+            [[DebugWindow shared] log:@"私有API不可用"];
         }
 
-        // 降级方案：截取所有窗口
+        // 降级方案
         UIGraphicsBeginImageContextWithOptions(screenRect.size, NO, screen.scale);
         CGContextRef context = UIGraphicsGetCurrentContext();
         if (!context) {
-            NSLog(@"创建图形上下文失败");
+            [[DebugWindow shared] log:@"创建图形上下文失败"];
             UIGraphicsEndImageContext();
             if (completion) completion(nil);
             return;
         }
 
         for (UIWindow *window in [UIApplication sharedApplication].windows) {
-            if (window.windowLevel < 10000000) {  // 排除悬浮窗
+            if (window.windowLevel < 10000000) {
                 [window.layer renderInContext:context];
             }
         }
         UIImage *screenshot = UIGraphicsGetImageFromCurrentImageContext();
         UIGraphicsEndImageContext();
 
-        NSLog(@"降级方案截屏: %@", screenshot ? @"成功" : @"失败");
+        [[DebugWindow shared] log:screenshot ? @"降级方案成功" : @"降级方案失败"];
         if (completion) completion(screenshot);
     });
 }
 
 - (void)processOCRResult:(NSString *)centerText handText:(NSString *)handText screenshot:(UIImage *)screenshot {
-    // 提取手牌
     NSString *extractedCards = [self extractCards:handText];
+    [[DebugWindow shared] log:[NSString stringWithFormat:@"提取: %@", extractedCards.length > 0 ? extractedCards : @"无"]];
 
-    // 输出调试信息到悬浮窗
-    NSString *debugInfo = [NSString stringWithFormat:@"中央:%@ | 手牌:%@ | 提取:%@",
-                          centerText.length > 0 ? centerText : @"无",
-                          handText.length > 0 ? handText : @"无",
-                          extractedCards.length > 0 ? extractedCards : @"无"];
-
-    if (self.onResultUpdate) self.onResultUpdate(debugInfo);
-
-    // 判断游戏阶段
     if ([centerText containsString:@"叫地主"] || [centerText containsString:@"抢地主"]) {
         self.currentPhase = GamePhaseLandlord;
+        [[DebugWindow shared] log:@"阶段: 叫地主"];
         [self handleLandlordPhase:extractedCards];
     } else if ([centerText containsString:@"加倍"]) {
         self.currentPhase = GamePhaseDouble;
+        [[DebugWindow shared] log:@"阶段: 加倍"];
         [self handleDoublePhase:centerText screenshot:screenshot];
     } else if (extractedCards.length > 0) {
         self.currentPhase = GamePhasePlay;
+        [[DebugWindow shared] log:@"阶段: 出牌"];
         [self handlePlayPhase:extractedCards];
+    } else {
+        if (self.onResultUpdate) self.onResultUpdate(@"等待中...");
     }
 }
 
