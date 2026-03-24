@@ -10,11 +10,16 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-    self.window.rootViewController = [[RootViewController alloc] init];
+    self.window.backgroundColor = [UIColor blackColor];
+
+    RootViewController *rootVC = [[RootViewController alloc] init];
+    self.window.rootViewController = rootVC;
     [self.window makeKeyAndVisible];
 
     // 后台保活
-    [self setupBackgroundAudio];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self setupBackgroundAudio];
+    });
 
     return YES;
 }
