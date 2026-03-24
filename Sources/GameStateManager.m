@@ -65,18 +65,21 @@ typedef NS_ENUM(NSInteger, GamePhase) {
     NSString *msg = @"开始截屏";
     if (self.onResultUpdate) self.onResultUpdate(msg);
     [[LogWindow shared] addLog:msg];
+    NSLog(@"[GameState] %@", msg);
 
     [self captureScreen:^(UIImage *screenshot) {
         if (!screenshot) {
             NSString *msg = @"截屏失败";
             if (self.onResultUpdate) self.onResultUpdate(msg);
             [[LogWindow shared] addLog:msg];
+            NSLog(@"[GameState] %@", msg);
             return;
         }
 
         NSString *msg = [NSString stringWithFormat:@"截屏成功:%ldx%ld", (long)screenshot.size.width, (long)screenshot.size.height];
         if (self.onResultUpdate) self.onResultUpdate(msg);
         [[LogWindow shared] addLog:msg];
+        NSLog(@"[GameState] %@", msg);
 
         // 尝试多个识别区域
         CGRect centerROI = [self getCenterROI:screenshot];
@@ -85,6 +88,7 @@ typedef NS_ENUM(NSInteger, GamePhase) {
         NSString *msg2 = [NSString stringWithFormat:@"中央ROI:%.0fx%.0f", centerROI.size.width, centerROI.size.height];
         if (self.onResultUpdate) self.onResultUpdate(msg2);
         [[LogWindow shared] addLog:msg2];
+        NSLog(@"[GameState] %@", msg2);
 
         UIImage *centerArea = [self cropImage:screenshot toRect:centerROI];
         UIImage *handArea = [self cropImage:screenshot toRect:handROI];
@@ -94,30 +98,35 @@ typedef NS_ENUM(NSInteger, GamePhase) {
             NSString *msg = @"裁剪失败";
             if (self.onResultUpdate) self.onResultUpdate(msg);
             [[LogWindow shared] addLog:msg];
+            NSLog(@"[GameState] %@", msg);
             return;
         }
 
         NSString *msg3 = @"开始OCR识别";
         if (self.onResultUpdate) self.onResultUpdate(msg3);
         [[LogWindow shared] addLog:msg3];
+        NSLog(@"[GameState] %@", msg3);
 
         // 先识别全屏（测试）
         [[OCRManager shared] recognizeImage:fullScreen completion:^(NSString *fullText) {
             NSString *msg = [NSString stringWithFormat:@"全屏OCR:%@", fullText.length > 0 ? [fullText substringToIndex:MIN(20, fullText.length)] : @"空"];
             if (self.onResultUpdate) self.onResultUpdate(msg);
             [[LogWindow shared] addLog:msg];
+            NSLog(@"[GameState] %@", msg);
 
             // 再识别中央
             [[OCRManager shared] recognizeImage:centerArea completion:^(NSString *centerText) {
                 NSString *msg = [NSString stringWithFormat:@"中央OCR:%@", centerText.length > 0 ? [centerText substringToIndex:MIN(20, centerText.length)] : @"空"];
                 if (self.onResultUpdate) self.onResultUpdate(msg);
                 [[LogWindow shared] addLog:msg];
+                NSLog(@"[GameState] %@", msg);
 
                 // 再识别手牌
                 [[OCRManager shared] recognizeImage:handArea completion:^(NSString *handText) {
                     NSString *msg = [NSString stringWithFormat:@"手牌OCR:%@", handText.length > 0 ? [handText substringToIndex:MIN(20, handText.length)] : @"空"];
                     if (self.onResultUpdate) self.onResultUpdate(msg);
                     [[LogWindow shared] addLog:msg];
+                    NSLog(@"[GameState] %@", msg);
 
                     // 去重：避免重复识别相同内容
                     NSString *combinedText = [NSString stringWithFormat:@"%@|%@", centerText, handText];
