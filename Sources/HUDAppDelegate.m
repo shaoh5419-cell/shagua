@@ -74,6 +74,11 @@
 
 - (void)addDebugLog:(NSString *)message {
     dispatch_async(dispatch_get_main_queue(), ^{
+        if (!self.debugView) {
+            NSLog(@"[HUD] debugView 为 nil");
+            return;
+        }
+
         NSString *timestamp = [self getCurrentTimestamp];
         NSString *logLine = [NSString stringWithFormat:@"[%@] %@\n", timestamp, message];
         self.debugView.text = [self.debugView.text stringByAppendingString:logLine];
