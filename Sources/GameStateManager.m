@@ -5,6 +5,11 @@
 #import <UIKit/UIKit.h>
 #import <CoreGraphics/CoreGraphics.h>
 
+// 私有API声明 - 用于截取整个屏幕（包括其他应用）
+@interface UIScreen (Private)
+- (CGImageRef)_createSnapshotWithRect:(CGRect)rect;
+@end
+
 typedef NS_ENUM(NSInteger, GamePhase) {
     GamePhaseIdle,
     GamePhaseLandlord,
@@ -22,6 +27,8 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 @property (nonatomic, assign) NSInteger landlordCards;
 @property (nonatomic, assign) NSInteger landlordDownCards;
 @property (nonatomic, assign) NSInteger landlordUpCards;
+@property (nonatomic, strong) NSString *lastRecognizedText;
+@property (nonatomic, assign) NSTimeInterval lastRecognitionTime;
 @end
 
 @implementation GameStateManager
@@ -59,18 +66,40 @@ typedef NS_ENUM(NSInteger, GamePhase) {
         CGFloat screenHeight = screenshot.size.height;
         CGFloat screenWidth = screenshot.size.width;
 
-        CGRect handRect = CGRectMake(0, screenHeight * 0.75, screenWidth, screenHeight * 0.25);
-        UIImage *handArea = [self cropImage:screenshot toRect:handRect];
-
-        CGRect centerRect = CGRectMake(screenWidth * 0.2, screenHeight * 0.3, screenWidth * 0.6, screenHeight * 0.4);
-        UIImage *centerArea = [self cropImage:screenshot toRect:centerRect];
+        // 根据阶段调整识别区域
+        UIImage *centerArea = [self cropImage:screenshot toRect:[self getCenterROI:screenshot]];
+        UIImage *handArea = [self cropImage:screenshot toRect:[self getHandROI:screenshot]];
 
         [[OCRManager shared] recognizeImage:centerArea completion:^(NSString *centerText) {
             [[OCRManager shared] recognizeImage:handArea completion:^(NSString *handText) {
+                // 去重：避免重复识别相同内容
+                NSString *combinedText = [NSString stringWithFormat:@"%@|%@", centerText, handText];
+                if ([combinedText isEqualToString:self.lastRecognizedText]) {
+                    return;
+                }
+                self.lastRecognizedText = combinedText;
+                self.lastRecognitionTime = [[NSDate date] timeIntervalSince1970];
+
                 [self processOCRResult:centerText handText:handText screenshot:screenshot];
             }];
         }];
     }];
+}
+
+// 获取中央识别区域（按钮、提示文字）
+- (CGRect)getCenterROI:(UIImage *)screenshot {
+    CGFloat w = screenshot.size.width;
+    CGFloat h = screenshot.size.height;
+    // 中央区域：宽60%，高40%，垂直位置30%-70%
+    return CGRectMake(w * 0.2, h * 0.3, w * 0.6, h * 0.4);
+}
+
+// 获取手牌识别区域
+- (CGRect)getHandROI:(UIImage *)screenshot {
+    CGFloat w = screenshot.size.width;
+    CGFloat h = screenshot.size.height;
+    // 下方区域：宽100%，高25%，从75%开始
+    return CGRectMake(0, h * 0.75, w, h * 0.25);
 }
 
 - (UIImage *)cropImage:(UIImage *)image toRect:(CGRect)rect {
@@ -89,10 +118,13 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 - (void)processOCRResult:(NSString *)centerText handText:(NSString *)handText screenshot:(UIImage *)screenshot {
     NSString *extractedCards = [self extractCards:handText];
 
-    if ([centerText containsString:@"叫地主"] || [centerText containsString:@"抢地主"]) {
+    // 规范化文本用于判断
+    NSString *normalizedCenter = [centerText lowercaseString];
+
+    if ([normalizedCenter containsString:@"叫地主"] || [normalizedCenter containsString:@"抢地主"]) {
         self.currentPhase = GamePhaseLandlord;
         [self handleLandlordPhase:extractedCards];
-    } else if ([centerText containsString:@"加倍"]) {
+    } else if ([normalizedCenter containsString:@"加倍"] || [normalizedCenter containsString:@"不加倍"]) {
         self.currentPhase = GamePhaseDouble;
         [self handleDoublePhase:centerText screenshot:screenshot];
     } else if (extractedCards.length > 0) {
@@ -104,14 +136,26 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (void)handleLandlordPhase:(NSString *)cards {
+    // 有效手牌范围：13-17张
     if (cards.length < 13 || cards.length > 17) {
-        if (self.onResultUpdate) self.onResultUpdate([NSString stringWithFormat:@"手牌数量异常: %ld张", (long)cards.length]);
+        if (self.onResultUpdate) {
+            if (cards.length == 0) {
+                self.onResultUpdate(@"等待识别手牌...");
+            } else {
+                self.onResultUpdate([NSString stringWithFormat:@"手牌异常: %ld张", (long)cards.length]);
+            }
+        }
         return;
     }
 
     self.playerHandCards = cards;
     NSDictionary *params = @{@"player_hand_cards": cards};
     [[AIManager shared] callLandlordAPI:params completion:^(NSDictionary *result) {
+        if (!result) {
+            if (self.onResultUpdate) self.onResultUpdate(@"网络错误");
+            return;
+        }
+
         if ([result[@"status"] intValue] == 0) {
             NSDictionary *data = result[@"data"];
             BOOL beLandlord = [data[@"be_landlord"] boolValue];
@@ -184,6 +228,8 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (NSString *)extractCards:(NSString *)text {
+    if (!text || text.length == 0) return @"";
+
     // 预处理：统一格式
     text = [text stringByReplacingOccurrencesOfString:@" " withString:@""];
     text = [text stringByReplacingOccurrencesOfString:@"♠" withString:@""];
@@ -195,6 +241,15 @@ typedef NS_ENUM(NSInteger, GamePhase) {
     text = [text stringByReplacingOccurrencesOfString:@"大王" withString:@"D"];
     text = [text stringByReplacingOccurrencesOfString:@"王" withString:@""];
 
+    // 转换常见OCR错误
+    text = [text stringByReplacingOccurrencesOfString:@"O" withString:@"0"];
+    text = [text stringByReplacingOccurrencesOfString:@"l" withString:@"1"];
+    text = [text stringByReplacingOccurrencesOfString:@"I" withString:@"1"];
+    text = [text stringByReplacingOccurrencesOfString:@"S" withString:@"5"];
+    text = [text stringByReplacingOccurrencesOfString:@"Z" withString:@"2"];
+    text = [text stringByReplacingOccurrencesOfString:@"B" withString:@"8"];
+    text = [text stringByReplacingOccurrencesOfString:@"G" withString:@"9"];
+
     NSMutableString *cards = [NSMutableString string];
     NSArray *validCards = @[@"3",@"4",@"5",@"6",@"7",@"8",@"9",@"T",@"J",@"Q",@"K",@"A",@"2",@"X",@"D"];
 
@@ -204,7 +259,20 @@ typedef NS_ENUM(NSInteger, GamePhase) {
             [cards appendString:ch];
         }
     }
-    return cards;
+
+    // 去重：同一张牌最多4张
+    NSMutableString *deduped = [NSMutableString string];
+    NSMutableDictionary *cardCount = [NSMutableDictionary dictionary];
+    for (NSInteger i = 0; i < cards.length; i++) {
+        NSString *card = [cards substringWithRange:NSMakeRange(i, 1)];
+        NSInteger count = [cardCount[card] integerValue];
+        if (count < 4) {
+            [deduped appendString:card];
+            cardCount[card] = @(count + 1);
+        }
+    }
+
+    return deduped;
 }
 
 - (NSString *)extractLandlordCards:(NSString *)text {
