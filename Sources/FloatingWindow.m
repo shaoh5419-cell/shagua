@@ -73,13 +73,13 @@
     [topGlow.layer addSublayer:topGrad];
     [container addSubview:topGlow];
 
-    // ═══ AI 图标（旋转90°逆时针）═══
+    // ═══ AI 图标（旋转90°顺时针）═══
     UILabel *iconLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 14, w, 32)];
     iconLabel.text = @"AI";
     iconLabel.textColor = [UIColor colorWithRed:0.12 green:0.65 blue:1.0 alpha:1.0];
     iconLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightBlack];
     iconLabel.textAlignment = NSTextAlignmentCenter;
-    iconLabel.transform = CGAffineTransformMakeRotation(-M_PI_2);
+    iconLabel.transform = CGAffineTransformMakeRotation(M_PI_2);
     [container addSubview:iconLabel];
 
     // ═══ 分隔线 ═══
@@ -165,16 +165,17 @@
         self.initialY = self.frame.origin.y;
     }
     else if (gesture.state == UIGestureRecognizerStateChanged) {
-        CGFloat translation = [gesture translationInView:self.rootVC.view].y;
+        CGFloat translation = [gesture translationInView:gesture.view.superview].y;
         CGFloat newY = self.initialY + translation;
 
         // 限制在屏幕范围内
         newY = MAX(0, MIN(newY, screen.size.height - self.frame.size.height));
 
-        // 直接修改窗口位置
-        CGRect newFrame = self.frame;
-        newFrame.origin.y = newY;
-        self.frame = newFrame;
+        // 修改窗口 Y 坐标，X 保持在右边缘
+        self.frame = CGRectMake(screen.size.width - self.frame.size.width,
+                                newY,
+                                self.frame.size.width,
+                                self.frame.size.height);
     }
 }
 
