@@ -51,20 +51,30 @@ extern char **environ;
         posix_spawnattr_init(&attr);
 
         pid_t pid;
-        const char *path = "/bin/launchctl";
+        const char *path = "/usr/bin/launchctl";
         const char *args[] = {path, "load", "/Library/LaunchDaemons/com.ddz.helper.daemon.plist", NULL};
-        posix_spawn(&pid, path, NULL, &attr, (char **)args, environ);
+        int result = posix_spawn(&pid, path, NULL, &attr, (char **)args, environ);
         posix_spawnattr_destroy(&attr);
 
-        self.startButton.selected = YES;
-        self.isRunning = YES;
+        if (result == 0) {
+            self.startButton.selected = YES;
+            self.isRunning = YES;
+
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"成功" message:@"悬浮窗已启动" preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+            [self presentViewController:alert animated:YES completion:nil];
+        } else {
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"错误" message:[NSString stringWithFormat:@"启动失败: %d", result] preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+            [self presentViewController:alert animated:YES completion:nil];
+        }
     } else {
         // 停止daemon
         posix_spawnattr_t attr;
         posix_spawnattr_init(&attr);
 
         pid_t pid;
-        const char *path = "/bin/launchctl";
+        const char *path = "/usr/bin/launchctl";
         const char *args[] = {path, "unload", "/Library/LaunchDaemons/com.ddz.helper.daemon.plist", NULL};
         posix_spawn(&pid, path, NULL, &attr, (char **)args, environ);
         posix_spawnattr_destroy(&attr);
