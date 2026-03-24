@@ -46,26 +46,43 @@ extern char **environ;
 
 - (void)startButtonTapped {
     if (!self.isRunning) {
-        if (!self.floatingWindow) {
-            self.floatingWindow = [[FloatingWindow alloc] init];
-        }
-        [self.floatingWindow show];
-        self.startButton.selected = YES;
-        self.isRunning = YES;
+        // 启动daemon
+        posix_spawnattr_t attr;
+        posix_spawnattr_init(&attr);
 
-        // 提示用户切换到其他应用
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"提示"
-            message:@"悬浮窗已启动，请切换到其他应用查看"
-            preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-            // 延迟退到后台
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                [[UIApplication sharedApplication] performSelector:@selector(suspend)];
-            });
-        }]];
-        [self presentViewController:alert animated:YES completion:nil];
+        pid_t pid;
+        const char *path = "/usr/bin/launchctl";
+        const char *args[] = {path, "load", "/Library/LaunchDaemons/com.ddz.helper.daemon.plist", NULL};
+        int result = posix_spawn(&pid, path, NULL, &attr, (char **)args, environ);
+        posix_spawnattr_destroy(&attr);
+
+        if (result == 0) {
+            self.startButton.selected = YES;
+            self.isRunning = YES;
+
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"成功"
+                message:@"悬浮窗已启动"
+                preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+            [self presentViewController:alert animated:YES completion:nil];
+        } else {
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"错误"
+                message:[NSString stringWithFormat:@"启动失败: %d (%s)", result, strerror(result)]
+                preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+            [self presentViewController:alert animated:YES completion:nil];
+        }
     } else {
-        [self.floatingWindow hide];
+        // 停止daemon
+        posix_spawnattr_t attr;
+        posix_spawnattr_init(&attr);
+
+        pid_t pid;
+        const char *path = "/usr/bin/launchctl";
+        const char *args[] = {path, "unload", "/Library/LaunchDaemons/com.ddz.helper.daemon.plist", NULL};
+        posix_spawn(&pid, path, NULL, &attr, (char **)args, environ);
+        posix_spawnattr_destroy(&attr);
+
         self.startButton.selected = NO;
         self.isRunning = NO;
     }
