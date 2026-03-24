@@ -23,10 +23,8 @@ int main(int argc, char *argv[]) {
 
             [NSRunLoop currentRunLoop];
 
-            if (@available(iOS 15.0, *)) {
-                GSEventInitialize(0);
-                GSEventPushRunLoopMode(kCFRunLoopDefaultMode);
-            }
+            GSEventInitialize(0);
+            GSEventPushRunLoopMode(kCFRunLoopDefaultMode);
 
             [[UIApplication sharedApplication] __completeAndRunAsPlugin];
             CFRunLoopRun();
