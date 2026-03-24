@@ -9,6 +9,11 @@
 
 @implementation FloatingWindow
 
++ (BOOL)_isSystemWindow { return YES; }
+- (BOOL)_isWindowServerHostingManaged { return NO; }
+- (BOOL)_isSecure { return YES; }
+- (BOOL)_shouldCreateContextAsSecure { return YES; }
+
 - (instancetype)init {
     CGFloat width = 200;
     CGFloat height = 80;
