@@ -18,8 +18,16 @@
         return;
     }
 
+    if (!image.CGImage) {
+        NSLog(@"OCR: 图像无效");
+        if (completion) completion(@"");
+        return;
+    }
+
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         @try {
+            NSLog(@"OCR: 开始识别，图像尺寸:%.0fx%.0f", image.size.width, image.size.height);
+
             VNRecognizeTextRequest *request = [[VNRecognizeTextRequest alloc] initWithCompletionHandler:^(VNRequest *request, NSError *error) {
                 if (error) {
                     NSLog(@"OCR错误: %@", error);
@@ -28,7 +36,10 @@
                 }
 
                 NSMutableString *text = [NSMutableString string];
+                NSInteger resultCount = 0;
+
                 if (request.results && request.results.count > 0) {
+                    resultCount = request.results.count;
                     for (VNRecognizedTextObservation *observation in request.results) {
                         VNRecognizedText *topCandidate = [observation topCandidates:1].firstObject;
                         if (topCandidate) {
@@ -37,6 +48,8 @@
                         }
                     }
                 }
+
+                NSLog(@"OCR: 识别完成，结果数:%ld，文本:%@", (long)resultCount, text.length > 0 ? text : @"空");
 
                 dispatch_async(dispatch_get_main_queue(), ^{
                     if (completion) completion(text.length > 0 ? text : @"");
@@ -48,14 +61,11 @@
             request.recognitionLanguages = @[@"zh-Hans"];
             request.usesLanguageCorrection = NO;
 
-            if (!image.CGImage) {
-                if (completion) completion(@"");
-                return;
-            }
-
             VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCGImage:image.CGImage options:@{}];
             NSError *error = nil;
             BOOL success = [handler performRequests:@[request] error:&error];
+
+            NSLog(@"OCR: performRequests 返回:%d，错误:%@", success, error);
 
             if (!success || error) {
                 NSLog(@"OCR执行错误: %@", error);

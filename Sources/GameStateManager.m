@@ -68,14 +68,16 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 
         if (self.onResultUpdate) self.onResultUpdate([NSString stringWithFormat:@"截屏成功:%ldx%ld", (long)screenshot.size.width, (long)screenshot.size.height]);
 
-        // 根据阶段调整识别区域
+        // 尝试多个识别区域
         CGRect centerROI = [self getCenterROI:screenshot];
         CGRect handROI = [self getHandROI:screenshot];
+        CGRect fullScreenROI = CGRectMake(0, 0, screenshot.size.width, screenshot.size.height);
 
         if (self.onResultUpdate) self.onResultUpdate([NSString stringWithFormat:@"中央ROI:%.0fx%.0f", centerROI.size.width, centerROI.size.height]);
 
         UIImage *centerArea = [self cropImage:screenshot toRect:centerROI];
         UIImage *handArea = [self cropImage:screenshot toRect:handROI];
+        UIImage *fullScreen = screenshot;
 
         if (!centerArea || !handArea) {
             if (self.onResultUpdate) self.onResultUpdate(@"裁剪失败");
@@ -84,23 +86,28 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 
         if (self.onResultUpdate) self.onResultUpdate(@"开始OCR识别");
 
-        // 先识别中央
-        [[OCRManager shared] recognizeImage:centerArea completion:^(NSString *centerText) {
-            if (self.onResultUpdate) self.onResultUpdate([NSString stringWithFormat:@"中央OCR完成:%@", centerText.length > 0 ? centerText : @"空"]);
+        // 先识别全屏（测试）
+        [[OCRManager shared] recognizeImage:fullScreen completion:^(NSString *fullText) {
+            if (self.onResultUpdate) self.onResultUpdate([NSString stringWithFormat:@"全屏OCR:%@", fullText.length > 0 ? [fullText substringToIndex:MIN(20, fullText.length)] : @"空"]);
 
-            // 再识别手牌
-            [[OCRManager shared] recognizeImage:handArea completion:^(NSString *handText) {
-                if (self.onResultUpdate) self.onResultUpdate([NSString stringWithFormat:@"手牌OCR完成:%@", handText.length > 0 ? handText : @"空"]);
+            // 再识别中央
+            [[OCRManager shared] recognizeImage:centerArea completion:^(NSString *centerText) {
+                if (self.onResultUpdate) self.onResultUpdate([NSString stringWithFormat:@"中央OCR:%@", centerText.length > 0 ? [centerText substringToIndex:MIN(20, centerText.length)] : @"空"]);
 
-                // 去重：避免重复识别相同内容
-                NSString *combinedText = [NSString stringWithFormat:@"%@|%@", centerText, handText];
-                if ([combinedText isEqualToString:self.lastRecognizedText]) {
-                    return;
-                }
-                self.lastRecognizedText = combinedText;
-                self.lastRecognitionTime = [[NSDate date] timeIntervalSince1970];
+                // 再识别手牌
+                [[OCRManager shared] recognizeImage:handArea completion:^(NSString *handText) {
+                    if (self.onResultUpdate) self.onResultUpdate([NSString stringWithFormat:@"手牌OCR:%@", handText.length > 0 ? [handText substringToIndex:MIN(20, handText.length)] : @"空"]);
 
-                [self processOCRResult:centerText handText:handText screenshot:screenshot];
+                    // 去重：避免重复识别相同内容
+                    NSString *combinedText = [NSString stringWithFormat:@"%@|%@", centerText, handText];
+                    if ([combinedText isEqualToString:self.lastRecognizedText]) {
+                        return;
+                    }
+                    self.lastRecognizedText = combinedText;
+                    self.lastRecognitionTime = [[NSDate date] timeIntervalSince1970];
+
+                    [self processOCRResult:centerText handText:handText screenshot:screenshot];
+                }];
             }];
         }];
     }];
