@@ -24,8 +24,7 @@ build:
     - mkdir -p Payload
     - cp -r .theos/_/Applications/DDZHelper.app Payload/
     - ls -la Payload/DDZHelper.app/
-    - cd Payload && zip -r ../DDZHelper.tipa DDZHelper.app && cd ..
-    - mv DDZHelper.tipa DDZHelper.ipa
+    - zip -r DDZHelper.ipa Payload
     - unzip -l DDZHelper.ipa
   artifacts:
     paths:
