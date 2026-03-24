@@ -78,7 +78,6 @@ typedef NS_ENUM(NSInteger, GamePhase) {
         // 尝试多个识别区域
         CGRect centerROI = [self getCenterROI:screenshot];
         CGRect handROI = [self getHandROI:screenshot];
-        CGRect fullScreenROI = CGRectMake(0, 0, screenshot.size.width, screenshot.size.height);
 
         NSString *msg2 = [NSString stringWithFormat:@"中央ROI:%.0fx%.0f", centerROI.size.width, centerROI.size.height];
         if (self.onResultUpdate) self.onResultUpdate(msg2);
