@@ -16,11 +16,6 @@
     self.window.rootViewController = rootVC;
     [self.window makeKeyAndVisible];
 
-    // 后台保活
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [self setupBackgroundAudio];
-    });
-
     return YES;
 }
 
