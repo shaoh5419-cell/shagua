@@ -5,7 +5,6 @@
 #import <signal.h>
 #import <errno.h>
 #import "PersonaHelpers.h"
-#import "LogWindow.h"
 
 extern char **environ;
 
@@ -138,16 +137,6 @@ extern char **environ;
     // ── 初始化状态 ──
     self.isRunning = [self isHUDRunning];
     [self refreshVisuals:NO];
-
-    // ── 日志按钮 ──
-    UIButton *logBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    logBtn.frame = CGRectMake(20, self.view.bounds.size.height - 50, 60, 35);
-    logBtn.backgroundColor = [UIColor colorWithRed:0.2 green:0.6 blue:0.2 alpha:0.8];
-    logBtn.layer.cornerRadius = 6;
-    [logBtn setTitle:@"日志" forState:UIControlStateNormal];
-    logBtn.titleLabel.font = [UIFont systemFontOfSize:12];
-    [logBtn addTarget:self action:@selector(showLogWindow) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:logBtn];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -204,22 +193,15 @@ extern char **environ;
 #pragma mark - 启动 / 停止
 
 - (void)startHUD {
-    [[LogWindow shared] addLog:@"startHUD 被调用"];
-
     // 防止重复启动：如果进程已存在则只刷新状态
     if ([self isHUDRunning]) {
-        [[LogWindow shared] addLog:@"HUD 已在运行"];
         self.isRunning = YES;
         [self refreshVisuals:NO];
         return;
     }
 
-    [[LogWindow shared] addLog:@"开始启动 HUD 进程"];
-
     NSString *plistPath = @"/Library/LaunchDaemons/com.ddz.helper.daemon.plist";
     BOOL usesDaemon = [[NSFileManager defaultManager] fileExistsAtPath:plistPath];
-
-    [[LogWindow shared] addLog:[NSString stringWithFormat:@"使用 Daemon: %@", usesDaemon ? @"是" : @"否"]];
 
     posix_spawnattr_t attr;
     posix_spawnattr_init(&attr);
@@ -245,8 +227,6 @@ extern char **environ;
         char *execPath = (char *)malloc(size);
         _NSGetExecutablePath(execPath, &size);
 
-        [[LogWindow shared] addLog:[NSString stringWithFormat:@"执行路径: %s", execPath]];
-
         const char *args[] = {execPath, "-hud", NULL};
         rc = posix_spawn(&task_pid, execPath, NULL, &attr, (char **)args, environ);
         posix_spawnattr_destroy(&attr);
@@ -259,11 +239,9 @@ extern char **environ;
     }
 
     if (rc == 0) {
-        [[LogWindow shared] addLog:[NSString stringWithFormat:@"HUD 进程启动成功, PID: %d", task_pid]];
         self.isRunning = YES;
         [self refreshVisuals:YES];
     } else {
-        [[LogWindow shared] addLog:[NSString stringWithFormat:@"HUD 进程启动失败: %s", strerror(rc)]];
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"启动失败"
             message:[NSString stringWithFormat:@"错误码: %d (%s)", rc, strerror(rc)]
             preferredStyle:UIAlertControllerStyleAlert];
@@ -362,10 +340,6 @@ extern char **environ;
     } else {
         update();
     }
-}
-
-- (void)showLogWindow {
-    [[LogWindow shared] show];
 }
 
 @end
