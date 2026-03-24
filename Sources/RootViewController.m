@@ -1,5 +1,8 @@
 #import "RootViewController.h"
 #import "FloatingWindow.h"
+#import <spawn.h>
+
+extern char **environ;
 
 @interface RootViewController ()
 @property (nonatomic, strong) UIButton *startButton;
@@ -43,19 +46,29 @@
 
 - (void)startButtonTapped {
     if (!self.isRunning) {
-        if (!self.floatingWindow) {
-            self.floatingWindow = [[FloatingWindow alloc] init];
-        }
-        [self.floatingWindow show];
+        // 启动daemon
+        posix_spawnattr_t attr;
+        posix_spawnattr_init(&attr);
+
+        pid_t pid;
+        const char *path = "/bin/launchctl";
+        const char *args[] = {path, "load", "/Library/LaunchDaemons/com.ddz.helper.daemon.plist", NULL};
+        posix_spawn(&pid, path, NULL, &attr, (char **)args, environ);
+        posix_spawnattr_destroy(&attr);
+
         self.startButton.selected = YES;
         self.isRunning = YES;
-
-        // 延迟退到后台
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [[UIApplication sharedApplication] performSelector:@selector(suspend)];
-        });
     } else {
-        [self.floatingWindow hide];
+        // 停止daemon
+        posix_spawnattr_t attr;
+        posix_spawnattr_init(&attr);
+
+        pid_t pid;
+        const char *path = "/bin/launchctl";
+        const char *args[] = {path, "unload", "/Library/LaunchDaemons/com.ddz.helper.daemon.plist", NULL};
+        posix_spawn(&pid, path, NULL, &attr, (char **)args, environ);
+        posix_spawnattr_destroy(&attr);
+
         self.startButton.selected = NO;
         self.isRunning = NO;
     }
