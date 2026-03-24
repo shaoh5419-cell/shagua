@@ -41,6 +41,7 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (void)startMonitoring {
+    [self showAlert:@"startMonitoring 被调用"];
     self.currentPhase = GamePhaseLandlord;
     if (self.onResultUpdate) self.onResultUpdate(@"监控中...");
     self.monitorTimer = [NSTimer scheduledTimerWithTimeInterval:2.0 target:self selector:@selector(captureAndAnalyze) userInfo:nil repeats:YES];
@@ -48,12 +49,28 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (void)showAlert:(NSString *)message {
+    NSLog(@"[DDZ] Alert: %@", message);
+
     dispatch_async(dispatch_get_main_queue(), ^{
+        UIWindow *keyWindow = [UIApplication sharedApplication].keyWindow;
+        if (!keyWindow) {
+            NSLog(@"[DDZ] keyWindow is nil");
+            return;
+        }
+
+        UIViewController *rootVC = keyWindow.rootViewController;
+        if (!rootVC) {
+            NSLog(@"[DDZ] rootViewController is nil");
+            return;
+        }
+
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"调试信息" message:message preferredStyle:UIAlertControllerStyleAlert];
         [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
 
-        UIViewController *rootVC = [UIApplication sharedApplication].keyWindow.rootViewController;
-        [rootVC presentViewController:alert animated:YES completion:nil];
+        NSLog(@"[DDZ] Presenting alert from %@", rootVC.class);
+        [rootVC presentViewController:alert animated:YES completion:^{
+            NSLog(@"[DDZ] Alert presented successfully");
+        }];
     });
 }
 
