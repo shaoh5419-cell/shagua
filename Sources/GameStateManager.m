@@ -2,6 +2,9 @@
 #import "OCRManager.h"
 #import "AIManager.h"
 #import <ReplayKit/ReplayKit.h>
+#import <CoreMedia/CoreMedia.h>
+#import <CoreVideo/CoreVideo.h>
+#import <CoreImage/CoreImage.h>
 
 typedef NS_ENUM(NSInteger, GamePhase) {
     GamePhaseIdle,
@@ -48,30 +51,48 @@ typedef NS_ENUM(NSInteger, GamePhase) {
     [self captureScreen:^(UIImage *screenshot) {
         if (!screenshot) return;
 
-        [[OCRManager shared] recognizeImage:screenshot completion:^(NSString *text) {
-            [self processOCRResult:text];
+        // 识别手牌区域（屏幕底部）
+        UIImage *handArea = [self cropImage:screenshot toRect:CGRectMake(0, screenshot.size.height * 0.7, screenshot.size.width, screenshot.size.height * 0.3)];
+
+        [[OCRManager shared] recognizeImage:handArea completion:^(NSString *text) {
+            [self processOCRResult:text screenshot:screenshot];
         }];
     }];
 }
 
-- (void)captureScreen:(void(^)(UIImage *image))completion {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        UIWindow *keyWindow = [UIApplication sharedApplication].keyWindow;
-        UIGraphicsBeginImageContextWithOptions(keyWindow.bounds.size, NO, [UIScreen mainScreen].scale);
-        [keyWindow drawViewHierarchyInRect:keyWindow.bounds afterScreenUpdates:YES];
-        UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
-        UIGraphicsEndImageContext();
-        if (completion) completion(image);
-    });
+- (UIImage *)cropImage:(UIImage *)image toRect:(CGRect)rect {
+    CGImageRef imageRef = CGImageCreateWithImageInRect(image.CGImage, rect);
+    UIImage *cropped = [UIImage imageWithCGImage:imageRef];
+    CGImageRelease(imageRef);
+    return cropped;
 }
 
-- (void)processOCRResult:(NSString *)text {
+- (void)captureScreen:(void(^)(UIImage *image))completion {
+    // 使用 ReplayKit 截屏，不会包含悬浮窗
+    [[RPScreenRecorder sharedRecorder] startCaptureWithHandler:^(CMSampleBufferRef sampleBuffer, RPSampleBufferType bufferType, NSError *error) {
+        if (bufferType == RPSampleBufferTypeVideo && sampleBuffer) {
+            CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+            CIImage *ciImage = [CIImage imageWithCVPixelBuffer:imageBuffer];
+            CIContext *context = [CIContext context];
+            CGImageRef cgImage = [context createCGImage:ciImage fromRect:ciImage.extent];
+            UIImage *screenshot = [UIImage imageWithCGImage:cgImage];
+            CGImageRelease(cgImage);
+
+            [[RPScreenRecorder sharedRecorder] stopCaptureWithHandler:nil];
+            if (completion) completion(screenshot);
+        }
+    } completionHandler:^(NSError *error) {
+        if (error && completion) completion(nil);
+    }];
+}
+
+- (void)processOCRResult:(NSString *)text screenshot:(UIImage *)screenshot {
     if ([text containsString:@"叫地主"] || [text containsString:@"抢地主"]) {
         self.currentPhase = GamePhaseLandlord;
         [self handleLandlordPhase:text];
     } else if ([text containsString:@"加倍"]) {
         self.currentPhase = GamePhaseDouble;
-        [self handleDoublePhase:text];
+        [self handleDoublePhase:text screenshot:screenshot];
     } else {
         self.currentPhase = GamePhasePlay;
         [self handlePlayPhase:text];
@@ -94,16 +115,21 @@ typedef NS_ENUM(NSInteger, GamePhase) {
     }];
 }
 
-- (void)handleDoublePhase:(NSString *)text {
-    self.threeLandlordCards = [self extractLandlordCards:text];
-    NSDictionary *params = @{@"player_hand_cards": self.playerHandCards, @"three_landlord_cards": self.threeLandlordCards};
-    [[AIManager shared] callDoubleAPI:params completion:^(NSDictionary *result) {
-        if ([result[@"status"] intValue] == 0) {
-            NSDictionary *data = result[@"data"];
-            BOOL canDouble = [data[@"can_double"] boolValue];
-            NSString *msg = canDouble ? @"建议：加倍" : @"建议：不加倍";
-            if (self.onResultUpdate) self.onResultUpdate(msg);
-        }
+- (void)handleDoublePhase:(NSString *)text screenshot:(UIImage *)screenshot {
+    // 识别屏幕中央的三张底牌
+    UIImage *landlordArea = [self cropImage:screenshot toRect:CGRectMake(screenshot.size.width * 0.3, screenshot.size.height * 0.4, screenshot.size.width * 0.4, screenshot.size.height * 0.2)];
+
+    [[OCRManager shared] recognizeImage:landlordArea completion:^(NSString *landlordText) {
+        self.threeLandlordCards = [self extractCards:landlordText];
+        NSDictionary *params = @{@"player_hand_cards": self.playerHandCards ?: @"", @"three_landlord_cards": self.threeLandlordCards ?: @""};
+        [[AIManager shared] callDoubleAPI:params completion:^(NSDictionary *result) {
+            if ([result[@"status"] intValue] == 0) {
+                NSDictionary *data = result[@"data"];
+                BOOL canDouble = [data[@"can_double"] boolValue];
+                NSString *msg = canDouble ? @"建议：加倍" : @"建议：不加倍";
+                if (self.onResultUpdate) self.onResultUpdate(msg);
+            }
+        }];
     }];
 }
 
@@ -141,12 +167,18 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (NSString *)extractCards:(NSString *)text {
-    NSString *cards = @"";
-    NSArray *cardChars = @[@"3",@"4",@"5",@"6",@"7",@"8",@"9",@"T",@"J",@"Q",@"K",@"A",@"2",@"X",@"D"];
+    // 卡牌映射：10->T, 小王->X, 大王->D
+    text = [text stringByReplacingOccurrencesOfString:@"10" withString:@"T"];
+    text = [text stringByReplacingOccurrencesOfString:@"小王" withString:@"X"];
+    text = [text stringByReplacingOccurrencesOfString:@"大王" withString:@"D"];
+
+    NSMutableString *cards = [NSMutableString string];
+    NSArray *validCards = @[@"3",@"4",@"5",@"6",@"7",@"8",@"9",@"T",@"J",@"Q",@"K",@"A",@"2",@"X",@"D"];
+
     for (NSInteger i = 0; i < text.length; i++) {
         NSString *ch = [text substringWithRange:NSMakeRange(i, 1)];
-        if ([cardChars containsObject:ch]) {
-            cards = [cards stringByAppendingString:ch];
+        if ([validCards containsObject:ch]) {
+            [cards appendString:ch];
         }
     }
     return cards;
