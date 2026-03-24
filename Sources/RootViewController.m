@@ -46,13 +46,24 @@ extern char **environ;
 
 - (void)startButtonTapped {
     if (!self.isRunning) {
+        // 检查plist文件是否存在
+        NSString *plistPath = @"/Library/LaunchDaemons/com.ddz.helper.daemon.plist";
+        if (![[NSFileManager defaultManager] fileExistsAtPath:plistPath]) {
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"错误"
+                message:@"LaunchDaemon配置文件不存在，请重新安装应用"
+                preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+            [self presentViewController:alert animated:YES completion:nil];
+            return;
+        }
+
         // 启动daemon
         posix_spawnattr_t attr;
         posix_spawnattr_init(&attr);
 
         pid_t pid;
         const char *path = "/usr/bin/launchctl";
-        const char *args[] = {path, "load", "/Library/LaunchDaemons/com.ddz.helper.daemon.plist", NULL};
+        const char *args[] = {path, "load", [plistPath UTF8String], NULL};
         int result = posix_spawn(&pid, path, NULL, &attr, (char **)args, environ);
         posix_spawnattr_destroy(&attr);
 
@@ -60,11 +71,15 @@ extern char **environ;
             self.startButton.selected = YES;
             self.isRunning = YES;
 
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"成功" message:@"悬浮窗已启动" preferredStyle:UIAlertControllerStyleAlert];
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"成功"
+                message:@"悬浮窗已启动"
+                preferredStyle:UIAlertControllerStyleAlert];
             [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
             [self presentViewController:alert animated:YES completion:nil];
         } else {
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"错误" message:[NSString stringWithFormat:@"启动失败: %d", result] preferredStyle:UIAlertControllerStyleAlert];
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"错误"
+                message:[NSString stringWithFormat:@"启动失败: %d (%s)", result, strerror(result)]
+                preferredStyle:UIAlertControllerStyleAlert];
             [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
             [self presentViewController:alert animated:YES completion:nil];
         }
