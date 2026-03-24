@@ -22,10 +22,12 @@ build:
     - make package FINALPACKAGE=1
     - ls -la .theos/_/
     - ls -la .theos/_/Library/LaunchDaemons/ || echo "LaunchDaemons not found"
-    - mkdir -p Payload
-    - cp -r .theos/_/Applications/DDZHelper.app Payload/
-    - ls -la Payload/DDZHelper.app/
-    - cd .theos/_/ && zip -r ../../DDZHelper.tipa . && cd ../..
+    - mkdir -p TrollStore/Payload
+    - cp -r .theos/_/Applications/DDZHelper.app TrollStore/Payload/
+    - cp -r .theos/_/Library TrollStore/
+    - ls -la TrollStore/
+    - ls -la TrollStore/Library/LaunchDaemons/
+    - cd TrollStore && zip -r ../DDZHelper.tipa . && cd ..
     - mv DDZHelper.tipa DDZHelper.ipa
     - unzip -l DDZHelper.ipa
   artifacts:
