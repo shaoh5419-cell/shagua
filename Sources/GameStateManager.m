@@ -1,10 +1,13 @@
 #import "GameStateManager.h"
 #import "OCRManager.h"
 #import "AIManager.h"
-#import <ReplayKit/ReplayKit.h>
-#import <CoreMedia/CoreMedia.h>
-#import <CoreVideo/CoreVideo.h>
-#import <CoreImage/CoreImage.h>
+#import <UIKit/UIKit.h>
+#import <CoreGraphics/CoreGraphics.h>
+
+// 私有API声明
+@interface UIScreen (Private)
+- (CGImageRef)_createSnapshotWithRect:(CGRect)rect;
+@end
 
 typedef NS_ENUM(NSInteger, GamePhase) {
     GamePhaseIdle,
@@ -81,26 +84,28 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (void)captureScreen:(void(^)(UIImage *image))completion {
-    // 使用私有API截取屏幕，排除悬浮窗
     dispatch_async(dispatch_get_main_queue(), ^{
-        NSArray *windows = [UIApplication sharedApplication].windows;
-        UIWindow *mainWindow = nil;
+        UIScreen *screen = [UIScreen mainScreen];
+        CGRect screenRect = screen.bounds;
 
-        // 找到主窗口（排除悬浮窗）
-        for (UIWindow *window in windows) {
-            if (window.windowLevel == UIWindowLevelNormal && !window.hidden) {
-                mainWindow = window;
-                break;
+        // 使用私有API截取整个屏幕
+        if ([screen respondsToSelector:@selector(_createSnapshotWithRect:)]) {
+            CGImageRef cgImage = [screen _createSnapshotWithRect:screenRect];
+            if (cgImage) {
+                UIImage *screenshot = [UIImage imageWithCGImage:cgImage];
+                CGImageRelease(cgImage);
+                if (completion) completion(screenshot);
+                return;
             }
         }
 
-        if (!mainWindow) {
-            if (completion) completion(nil);
-            return;
+        // 降级方案：截取所有窗口
+        UIGraphicsBeginImageContextWithOptions(screenRect.size, NO, screen.scale);
+        for (UIWindow *window in [UIApplication sharedApplication].windows) {
+            if (window.windowLevel < 10000000) {  // 排除悬浮窗
+                [window drawViewHierarchyInRect:window.bounds afterScreenUpdates:NO];
+            }
         }
-
-        UIGraphicsBeginImageContextWithOptions(mainWindow.bounds.size, NO, [UIScreen mainScreen].scale);
-        [mainWindow drawViewHierarchyInRect:mainWindow.bounds afterScreenUpdates:NO];
         UIImage *screenshot = UIGraphicsGetImageFromCurrentImageContext();
         UIGraphicsEndImageContext();
 

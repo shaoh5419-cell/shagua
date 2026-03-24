@@ -38,7 +38,7 @@
     request.recognitionLanguages = @[@"zh-Hans", @"en-US"];
     request.usesLanguageCorrection = YES;
 
-    VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCGImage:image.CGImage options:@];
+    VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCGImage:image.CGImage options:@{}];
     [handler performRequests:@[request] error:nil];
 }
 
