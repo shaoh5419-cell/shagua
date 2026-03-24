@@ -50,23 +50,26 @@
 
 - (void)createDebugWindow {
     CGRect screen = [UIScreen mainScreen].bounds;
-    UIWindow *debugWindow = [[UIWindow alloc] initWithFrame:CGRectMake(0, screen.size.height - 150, screen.size.width, 150)];
-    debugWindow.windowLevel = 10000030.0;
+    // 放在顶部，高度 200
+    UIWindow *debugWindow = [[UIWindow alloc] initWithFrame:CGRectMake(0, 0, screen.size.width, 200)];
+    debugWindow.windowLevel = 10000050.0;  // 比悬浮窗更高
     debugWindow.backgroundColor = [UIColor colorWithRed:0.1 green:0.1 blue:0.1 alpha:0.95];
 
     UIViewController *vc = [[UIViewController alloc] init];
     vc.view.backgroundColor = [UIColor clearColor];
     debugWindow.rootViewController = vc;
 
-    self.debugView = [[UITextView alloc] initWithFrame:CGRectMake(0, 0, screen.size.width, 150)];
+    self.debugView = [[UITextView alloc] initWithFrame:CGRectMake(0, 0, screen.size.width, 200)];
     self.debugView.backgroundColor = [UIColor colorWithRed:0.05 green:0.05 blue:0.05 alpha:1.0];
     self.debugView.textColor = [UIColor colorWithRed:1.0 green:1.0 blue:0.0 alpha:1.0];
-    self.debugView.font = [UIFont systemFontOfSize:9];
+    self.debugView.font = [UIFont systemFontOfSize:10];
     self.debugView.editable = NO;
     self.debugView.scrollEnabled = YES;
     [vc.view addSubview:self.debugView];
 
     [debugWindow makeKeyAndVisible];
+
+    NSLog(@"[HUD] 调试窗口已创建");
 }
 
 - (void)addDebugLog:(NSString *)message {
