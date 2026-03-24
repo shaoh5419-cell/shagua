@@ -116,10 +116,10 @@
     self.displayLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
     self.displayLabel.numberOfLines = 1;
     self.displayLabel.textAlignment = NSTextAlignmentCenter;
-    self.displayLabel.text = @"AI决策：｜等待识别...";
+    self.displayLabel.text = @"等待识别...";
 
-    // 旋转90°（逆时针），横屏时文字从左到右正常阅读
-    self.displayLabel.transform = CGAffineTransformMakeRotation(-M_PI_2);
+    // 旋转90°（顺时针），横屏时文字从左到右正常阅读
+    self.displayLabel.transform = CGAffineTransformMakeRotation(M_PI_2);
     self.displayLabel.center = CGPointMake(textContainer.bounds.size.width / 2,
                                            textContainer.bounds.size.height / 2);
     [textContainer addSubview:self.displayLabel];
@@ -139,8 +139,8 @@
     __weak typeof(self) weakSelf = self;
     self.gameManager.onResultUpdate = ^(NSString *result) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            // 格式化为单行："AI决策：｜结果"
-            weakSelf.displayLabel.text = [NSString stringWithFormat:@"AI决策：｜%@", result];
+            // 直接显示结果内容
+            weakSelf.displayLabel.text = result;
 
             // 指示点脉冲动画
             [weakSelf pulseIndicator];
