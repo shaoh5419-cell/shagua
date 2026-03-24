@@ -10,6 +10,7 @@ DDZHelper_FRAMEWORKS = UIKit CoreGraphics QuartzCore AVFoundation ReplayKit
 DDZHelper_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -IHeaders
 DDZHelper_LDFLAGS = -lsubstrate -lc++
 DDZHelper_INSTALL_PATH = /Applications
+DDZHelper_CODESIGN_FLAGS = -SResources/entitlements.plist
 
 include $(THEOS_MAKE_PATH)/application.mk
 
