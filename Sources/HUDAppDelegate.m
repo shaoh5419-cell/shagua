@@ -1,5 +1,6 @@
 #import "HUDAppDelegate.h"
 #import "FloatingWindow.h"
+#import "LogWindow.h"
 #import "SBSAccessibilityWindowHostingController.h"
 #import "UIWindow+Private.h"
 
@@ -8,13 +9,18 @@
 }
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+    [[LogWindow shared] addLog:@"HUDAppDelegate 启动"];
+
     FloatingWindow *floatingWindow = [[FloatingWindow alloc] init];
     self.window = floatingWindow;
 
     [self.window setWindowLevel:10000010.0];
     [self.window setHidden:NO];
     [self.window makeKeyAndVisible];
+
+    [[LogWindow shared] addLog:@"悬浮窗已创建"];
     [floatingWindow show];
+    [[LogWindow shared] addLog:@"悬浮窗已显示"];
 
     // 关键：向SpringBoard注册窗口，使其全局可见
     _windowHostingController = [[SBSAccessibilityWindowHostingController alloc] init];
@@ -29,6 +35,8 @@
     [invocation setArgument:&contextId atIndex:2];
     [invocation setArgument:&windowLevel atIndex:3];
     [invocation invoke];
+
+    [[LogWindow shared] addLog:@"HUDAppDelegate 启动完成"];
 
     return YES;
 }
