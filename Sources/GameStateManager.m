@@ -42,7 +42,9 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 
 - (void)startMonitoring {
     self.currentPhase = GamePhaseLandlord;
+    if (self.onResultUpdate) self.onResultUpdate(@"开始监控...");
     self.monitorTimer = [NSTimer scheduledTimerWithTimeInterval:2.0 target:self selector:@selector(captureAndAnalyze) userInfo:nil repeats:YES];
+    [self captureAndAnalyze];  // 立即执行一次
 }
 
 - (void)stopMonitoring {
@@ -51,11 +53,15 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (void)captureAndAnalyze {
+    if (self.onResultUpdate) self.onResultUpdate(@"正在截屏...");
+
     [self captureScreen:^(UIImage *screenshot) {
         if (!screenshot) {
             if (self.onResultUpdate) self.onResultUpdate(@"截屏失败");
             return;
         }
+
+        if (self.onResultUpdate) self.onResultUpdate(@"截屏成功，识别中...");
 
         CGFloat screenHeight = screenshot.size.height;
         CGFloat screenWidth = screenshot.size.width;
@@ -70,6 +76,7 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 
         [[OCRManager shared] recognizeImage:centerArea completion:^(NSString *centerText) {
             [[OCRManager shared] recognizeImage:handArea completion:^(NSString *handText) {
+                if (self.onResultUpdate) self.onResultUpdate(@"OCR完成，分析中...");
                 [self processOCRResult:centerText handText:handText screenshot:screenshot];
             }];
         }];
@@ -117,10 +124,13 @@ typedef NS_ENUM(NSInteger, GamePhase) {
     // 提取手牌
     NSString *extractedCards = [self extractCards:handText];
 
-    // 调试信息
-    NSLog(@"中央文本: %@", centerText);
-    NSLog(@"手牌文本: %@", handText);
-    NSLog(@"提取卡牌: %@", extractedCards);
+    // 输出调试信息到悬浮窗
+    NSString *debugInfo = [NSString stringWithFormat:@"中央:%@ | 手牌:%@ | 提取:%@",
+                          centerText.length > 0 ? centerText : @"无",
+                          handText.length > 0 ? handText : @"无",
+                          extractedCards.length > 0 ? extractedCards : @"无"];
+
+    if (self.onResultUpdate) self.onResultUpdate(debugInfo);
 
     // 判断游戏阶段
     if ([centerText containsString:@"叫地主"] || [centerText containsString:@"抢地主"]) {
@@ -132,8 +142,6 @@ typedef NS_ENUM(NSInteger, GamePhase) {
     } else if (extractedCards.length > 0) {
         self.currentPhase = GamePhasePlay;
         [self handlePlayPhase:extractedCards];
-    } else {
-        if (self.onResultUpdate) self.onResultUpdate(@"等待游戏开始...");
     }
 }
 
