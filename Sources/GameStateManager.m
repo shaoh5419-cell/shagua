@@ -45,10 +45,13 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 }
 
 - (void)startMonitoring {
+    [[LogWindow shared] addLog:@"startMonitoring 被调用"];
     self.currentPhase = GamePhaseLandlord;
     if (self.onResultUpdate) self.onResultUpdate(@"监控中...");
     [[ReplayKitManager shared] startRecording];
+    [[LogWindow shared] addLog:@"ReplayKit 录屏已启动"];
     self.monitorTimer = [NSTimer scheduledTimerWithTimeInterval:2.0 target:self selector:@selector(captureAndAnalyze) userInfo:nil repeats:YES];
+    [[LogWindow shared] addLog:@"定时器已启动"];
     [self captureAndAnalyze];
 }
 
