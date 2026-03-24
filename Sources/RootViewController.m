@@ -46,15 +46,30 @@ extern char **environ;
 
 - (void)startButtonTapped {
     if (!self.isRunning) {
-        // 检查plist文件是否存在
+        // 检查并安装plist文件
         NSString *plistPath = @"/Library/LaunchDaemons/com.ddz.helper.daemon.plist";
         if (![[NSFileManager defaultManager] fileExistsAtPath:plistPath]) {
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"错误"
-                message:@"LaunchDaemon配置文件不存在，请重新安装应用"
-                preferredStyle:UIAlertControllerStyleAlert];
-            [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
-            [self presentViewController:alert animated:YES completion:nil];
-            return;
+            // 从应用bundle复制plist到系统目录
+            NSString *bundlePlist = [[NSBundle mainBundle] pathForResource:@"com.ddz.helper.daemon" ofType:@"plist"];
+            if (bundlePlist) {
+                NSError *error = nil;
+                [[NSFileManager defaultManager] copyItemAtPath:bundlePlist toPath:plistPath error:&error];
+                if (error) {
+                    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"错误"
+                        message:[NSString stringWithFormat:@"无法安装配置文件: %@", error.localizedDescription]
+                        preferredStyle:UIAlertControllerStyleAlert];
+                    [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+                    [self presentViewController:alert animated:YES completion:nil];
+                    return;
+                }
+            } else {
+                UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"错误"
+                    message:@"应用包中缺少配置文件"
+                    preferredStyle:UIAlertControllerStyleAlert];
+                [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+                [self presentViewController:alert animated:YES completion:nil];
+                return;
+            }
         }
 
         // 启动daemon
