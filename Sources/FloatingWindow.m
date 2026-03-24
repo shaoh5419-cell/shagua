@@ -3,6 +3,7 @@
 
 @interface FloatingWindow ()
 @property (nonatomic, strong) UILabel *displayLabel;
+@property (nonatomic, strong) UIView *indicatorDot;
 @property (nonatomic, strong) GameStateManager *gameManager;
 @property (nonatomic, strong) UIViewController *rootVC;
 @end
@@ -15,56 +16,85 @@
 - (BOOL)_shouldCreateContextAsSecure { return YES; }
 
 - (instancetype)init {
-    CGFloat width = 200;
-    CGFloat height = 80;
-    CGRect frame = CGRectMake(20, 100, width, height);
+    CGRect screen = [UIScreen mainScreen].bounds;
+    CGFloat w = 200;
+    CGFloat h = 68;
 
-    self = [super initWithFrame:frame];
+    // 横屏左旋（home在左）时，portrait右侧 = landscape右侧上方
+    // 初始位置：portrait右边缘，垂直居中偏上；可拖动调整
+    CGFloat x = screen.size.width - w - 10;
+    CGFloat y = screen.size.height * 0.35 - h / 2;
 
-    if (self) {
-        self.windowLevel = 10000010.0;  // 使用TrollSpeed相同的超高level
-        self.backgroundColor = [UIColor clearColor];
-        self.opaque = NO;
+    self = [super initWithFrame:CGRectMake(x, y, w, h)];
+    if (!self) return nil;
 
-        self.rootVC = [[UIViewController alloc] init];
-        self.rootViewController = self.rootVC;
+    self.windowLevel = 10000010.0;
+    self.backgroundColor = [UIColor clearColor];
+    self.opaque = NO;
 
-        // 创建背景视图
-        UIView *bgView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, width, height)];
-        bgView.backgroundColor = [UIColor colorWithWhite:0.05 alpha:0.9];
-        bgView.layer.cornerRadius = 12;
-        bgView.layer.borderWidth = 2;
-        bgView.layer.borderColor = [UIColor colorWithRed:0.2 green:0.5 blue:1.0 alpha:0.6].CGColor;
-        [self.rootVC.view addSubview:bgView];
+    self.rootVC = [[UIViewController alloc] init];
+    self.rootVC.view.backgroundColor = [UIColor clearColor];
+    self.rootViewController = self.rootVC;
 
-        // 创建标题标签
-        UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 5, width-20, 20)];
-        titleLabel.text = @"AI助手";
-        titleLabel.textColor = [UIColor colorWithRed:0.4 green:0.7 blue:1.0 alpha:1.0];
-        titleLabel.font = [UIFont boldSystemFontOfSize:12];
-        titleLabel.textAlignment = NSTextAlignmentCenter;
-        [self.rootVC.view addSubview:titleLabel];
+    // 主背景：深色磨砂胶囊
+    UIView *bg = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, h)];
+    bg.backgroundColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.10 alpha:0.92];
+    bg.layer.cornerRadius = h / 2;
+    bg.layer.borderWidth = 1.0;
+    bg.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.10].CGColor;
+    // 投影
+    bg.layer.shadowColor = [UIColor blackColor].CGColor;
+    bg.layer.shadowOffset = CGSizeMake(0, 4);
+    bg.layer.shadowRadius = 10;
+    bg.layer.shadowOpacity = 0.5;
+    [self.rootVC.view addSubview:bg];
 
-        // 创建显示标签
-        self.displayLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 25, width-20, height-30)];
-        self.displayLabel.textColor = [UIColor whiteColor];
-        self.displayLabel.font = [UIFont systemFontOfSize:14];
-        self.displayLabel.numberOfLines = 0;
-        self.displayLabel.textAlignment = NSTextAlignmentCenter;
-        self.displayLabel.text = @"等待识别...";
-        [self.rootVC.view addSubview:self.displayLabel];
+    // 左侧彩色指示条
+    UIView *stripe = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 4, h)];
+    stripe.backgroundColor = [UIColor colorWithRed:0.20 green:0.75 blue:1.0 alpha:1.0];
+    // 左侧胶囊圆角裁剪
+    UIView *stripeWrap = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 16, h)];
+    stripeWrap.clipsToBounds = YES;
+    stripeWrap.layer.cornerRadius = h / 2;
+    stripeWrap.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMinXMaxYCorner;
+    [stripeWrap addSubview:stripe];
+    [bg addSubview:stripeWrap];
 
-        // 添加手势
-        UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
-        [self.rootVC.view addGestureRecognizer:pan];
+    // "AI" 小标签
+    UILabel *aiLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 0, 28, h)];
+    aiLabel.text = @"AI";
+    aiLabel.textColor = [UIColor colorWithRed:0.20 green:0.75 blue:1.0 alpha:1.0];
+    aiLabel.font = [UIFont boldSystemFontOfSize:11];
+    aiLabel.textAlignment = NSTextAlignmentCenter;
+    [bg addSubview:aiLabel];
 
-        // 初始化游戏管理器
-        self.gameManager = [[GameStateManager alloc] init];
-        __weak typeof(self) weakSelf = self;
-        self.gameManager.onResultUpdate = ^(NSString *result) {
-            [weakSelf updateText:result];
-        };
-    }
+    // 分隔线
+    UIView *sep = [[UIView alloc] initWithFrame:CGRectMake(38, 12, 1, h - 24)];
+    sep.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.12];
+    [bg addSubview:sep];
+
+    // 主文本标签
+    self.displayLabel = [[UILabel alloc] initWithFrame:CGRectMake(46, 0, w - 54, h)];
+    self.displayLabel.textColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+    self.displayLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    self.displayLabel.numberOfLines = 2;
+    self.displayLabel.textAlignment = NSTextAlignmentLeft;
+    self.displayLabel.text = @"等待识别...";
+    [bg addSubview:self.displayLabel];
+
+    // 拖动手势
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
+    [bg addGestureRecognizer:pan];
+
+    // 游戏状态管理
+    self.gameManager = [[GameStateManager alloc] init];
+    __weak typeof(self) weakSelf = self;
+    self.gameManager.onResultUpdate = ^(NSString *result) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            weakSelf.displayLabel.text = result;
+        });
+    };
+
     return self;
 }
 
@@ -79,21 +109,13 @@
     self.hidden = YES;
 }
 
-- (void)updateText:(NSString *)text {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        self.displayLabel.text = text;
-    });
-}
-
 - (void)handlePan:(UIPanGestureRecognizer *)gesture {
-    CGPoint translation = [gesture translationInView:self];
-    CGPoint newCenter = CGPointMake(self.center.x + translation.x, self.center.y + translation.y);
-
-    CGRect screenBounds = [UIScreen mainScreen].bounds;
-    newCenter.x = MAX(self.frame.size.width/2, MIN(newCenter.x, screenBounds.size.width - self.frame.size.width/2));
-    newCenter.y = MAX(self.frame.size.height/2, MIN(newCenter.y, screenBounds.size.height - self.frame.size.height/2));
-
-    self.center = newCenter;
+    CGPoint delta = [gesture translationInView:self];
+    CGRect screen = [UIScreen mainScreen].bounds;
+    CGPoint c = self.center;
+    c.x = MAX(self.frame.size.width / 2, MIN(c.x + delta.x, screen.size.width - self.frame.size.width / 2));
+    c.y = MAX(self.frame.size.height / 2, MIN(c.y + delta.y, screen.size.height - self.frame.size.height / 2));
+    self.center = c;
     [gesture setTranslation:CGPointZero inView:self];
 }
 
