@@ -3,6 +3,7 @@
 #import <sys/wait.h>
 #import <mach-o/dyld.h>
 #import <signal.h>
+#import <errno.h>
 #import "PersonaHelpers.h"
 
 extern char **environ;
@@ -138,6 +139,16 @@ extern char **environ;
     [self refreshVisuals:NO];
 }
 
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    // 每次界面出现时重新检测，避免后台期间状态变化
+    BOOL running = [self isHUDRunning];
+    if (running != self.isRunning) {
+        self.isRunning = running;
+        [self refreshVisuals:NO];
+    }
+}
+
 #pragma mark - HUD 检测
 
 - (BOOL)isHUDRunning {
@@ -146,7 +157,12 @@ extern char **environ;
                                                     error:nil];
     if (!pidStr) return NO;
     pid_t pid = (pid_t)[pidStr intValue];
-    return (kill(pid, 0) == 0);
+    if (pid <= 0) return NO;
+    int rc = kill(pid, 0);
+    // rc==0: 进程存在且有权限
+    // rc==-1 EPERM: 进程存在但无权（HUD以root运行，本进程为mobile，正常现象）
+    // rc==-1 ESRCH: 进程不存在
+    return (rc == 0 || (rc == -1 && errno == EPERM));
 }
 
 #pragma mark - 按钮交互
@@ -177,6 +193,13 @@ extern char **environ;
 #pragma mark - 启动 / 停止
 
 - (void)startHUD {
+    // 防止重复启动：如果进程已存在则只刷新状态
+    if ([self isHUDRunning]) {
+        self.isRunning = YES;
+        [self refreshVisuals:NO];
+        return;
+    }
+
     NSString *plistPath = @"/Library/LaunchDaemons/com.ddz.helper.daemon.plist";
     BOOL usesDaemon = [[NSFileManager defaultManager] fileExistsAtPath:plistPath];
 
