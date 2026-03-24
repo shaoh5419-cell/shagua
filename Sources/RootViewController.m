@@ -46,62 +46,20 @@ extern char **environ;
 
 - (void)startButtonTapped {
     if (!self.isRunning) {
-        // 检查文件是否存在
-        NSString *plistPath = @"/Library/LaunchDaemons/com.ddz.helper.daemon.plist";
-        NSString *launchctlPath = @"/usr/bin/launchctl";
-
-        BOOL plistExists = [[NSFileManager defaultManager] fileExistsAtPath:plistPath];
-        BOOL launchctlExists = [[NSFileManager defaultManager] fileExistsAtPath:launchctlPath];
-
-        if (!plistExists || !launchctlExists) {
-            NSString *msg = [NSString stringWithFormat:@"plist存在: %@\nlaunchctl存在: %@\n\n请检查TrollStore是否正确安装了系统文件",
-                plistExists ? @"是" : @"否",
-                launchctlExists ? @"是" : @"否"];
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"文件检查"
-                message:msg
-                preferredStyle:UIAlertControllerStyleAlert];
-            [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
-            [self presentViewController:alert animated:YES completion:nil];
-            return;
+        if (!self.floatingWindow) {
+            self.floatingWindow = [[FloatingWindow alloc] init];
         }
+        [self.floatingWindow show];
+        self.startButton.selected = YES;
+        self.isRunning = YES;
 
-        // 启动daemon
-        posix_spawnattr_t attr;
-        posix_spawnattr_init(&attr);
-
-        pid_t pid;
-        const char *path = [launchctlPath UTF8String];
-        const char *args[] = {path, "load", [plistPath UTF8String], NULL};
-        int result = posix_spawn(&pid, path, NULL, &attr, (char **)args, environ);
-        posix_spawnattr_destroy(&attr);
-
-        if (result == 0) {
-            self.startButton.selected = YES;
-            self.isRunning = YES;
-
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"成功"
-                message:@"悬浮窗已启动"
-                preferredStyle:UIAlertControllerStyleAlert];
-            [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
-            [self presentViewController:alert animated:YES completion:nil];
-        } else {
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"错误"
-                message:[NSString stringWithFormat:@"启动失败: %d (%s)", result, strerror(result)]
-                preferredStyle:UIAlertControllerStyleAlert];
-            [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
-            [self presentViewController:alert animated:YES completion:nil];
-        }
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"成功"
+            message:@"悬浮窗已启动，现在可以切换到其他应用"
+            preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
     } else {
-        // 停止daemon
-        posix_spawnattr_t attr;
-        posix_spawnattr_init(&attr);
-
-        pid_t pid;
-        const char *path = "/usr/bin/launchctl";
-        const char *args[] = {path, "unload", "/Library/LaunchDaemons/com.ddz.helper.daemon.plist", NULL};
-        posix_spawn(&pid, path, NULL, &attr, (char **)args, environ);
-        posix_spawnattr_destroy(&attr);
-
+        [self.floatingWindow hide];
         self.startButton.selected = NO;
         self.isRunning = NO;
     }

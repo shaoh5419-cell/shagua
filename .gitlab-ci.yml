@@ -20,15 +20,10 @@ build:
     - export THEOS=$HOME/theos
     - export SDKVERSION=13.7
     - make package FINALPACKAGE=1
-    - ls -la .theos/_/
-    - ls -la .theos/_/Library/LaunchDaemons/ || echo "LaunchDaemons not found"
-    - mkdir -p TrollStore/Payload
-    - cp -r .theos/_/Applications/DDZHelper.app TrollStore/Payload/
-    - cp -r .theos/_/Library TrollStore/
-    - ls -la TrollStore/
-    - ls -la TrollStore/Library/LaunchDaemons/
-    - cd TrollStore && zip -r ../DDZHelper.tipa . && cd ..
-    - mv DDZHelper.tipa DDZHelper.ipa
+    - mkdir -p Payload
+    - cp -r .theos/_/Applications/DDZHelper.app Payload/
+    - ls -la Payload/DDZHelper.app/
+    - zip -r DDZHelper.ipa Payload
     - unzip -l DDZHelper.ipa
   artifacts:
     paths:
