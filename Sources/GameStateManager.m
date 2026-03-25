@@ -60,6 +60,7 @@ typedef NS_ENUM(NSInteger, GamePhase) {
 - (void)captureAndAnalyze {
     [self captureScreen:^(UIImage *screenshot) {
         if (!screenshot) {
+            if (self.onResultUpdate) self.onResultUpdate(@"截图失败");
             return;
         }
 
@@ -72,10 +73,30 @@ typedef NS_ENUM(NSInteger, GamePhase) {
         CGRect centerRect = CGRectMake(screenWidth * 0.2, screenHeight * 0.3, screenWidth * 0.6, screenHeight * 0.4);
         UIImage *centerArea = [self cropImage:screenshot toRect:centerRect];
 
-        [[OCRManager shared] recognizeImage:centerArea completion:^(NSString *centerText) {
-            [[OCRManager shared] recognizeImage:handArea completion:^(NSString *handText) {
-                [self processOCRResult:centerText handText:handText screenshot:screenshot];
-            }];
+        // 并行识别中央区域和手牌区域，提高效率
+        __block NSString *centerText = nil;
+        __block NSString *handText = nil;
+        __block NSInteger completedCount = 0;
+        dispatch_queue_t queue = dispatch_queue_create("ocr.recognition", DISPATCH_QUEUE_SERIAL);
+
+        [[OCRManager shared] recognizeImage:centerArea completion:^(NSString *result) {
+            dispatch_async(queue, ^{
+                centerText = result ?: @"";
+                completedCount++;
+                if (completedCount == 2) {
+                    [self processOCRResult:centerText handText:handText screenshot:screenshot];
+                }
+            });
+        }];
+
+        [[OCRManager shared] recognizeImage:handArea completion:^(NSString *result) {
+            dispatch_async(queue, ^{
+                handText = result ?: @"";
+                completedCount++;
+                if (completedCount == 2) {
+                    [self processOCRResult:centerText handText:handText screenshot:screenshot];
+                }
+            });
         }];
     }];
 }

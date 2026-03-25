@@ -12,6 +12,8 @@ DDZHelper_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -IHeaders
 DDZHelper_LDFLAGS = -lc++
 DDZHelper_INSTALL_PATH = /Applications
 DDZHelper_CODESIGN_FLAGS = -SResources/entitlements.plist
+DDZHelper_FRAMEWORK_SEARCH_PATHS = ../aip-ocr-ios-sdk-3.0.9/AipOcrDemo
+DDZHelper_FRAMEWORKS += AipOcrSdk
 
 include $(THEOS_MAKE_PATH)/application.mk
 
